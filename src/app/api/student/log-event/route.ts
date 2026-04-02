@@ -1,26 +1,24 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { getIronSession } from 'iron-session';
 import { cookies } from 'next/headers';
-import { sessionOptions, SessionData } from '@/lib/session';
+import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
+import { sessionOptions, SessionData } from '@/lib/session';
 
 export async function POST(req: NextRequest) {
-  const session = await getIronSession<SessionData>(await cookies(), sessionOptions);
-  if (!session.userId || session.role !== 'student') {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const session = await getIronSession<SessionData>(cookies(), sessionOptions);
+  if (session.role !== 'student') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
   }
 
-  const { event } = await req.json();
+  const { event, count } = await req.json();
 
-  // Find the active assessment
-  const assessment = db.prepare('SELECT id FROM assessments WHERE is_active = 1 LIMIT 1').get() as { id: number } | undefined;
-  if (!assessment) {
-    return NextResponse.json({ error: 'No active assessment' }, { status: 400 });
+  try {
+    db.prepare(
+      'INSERT INTO student_events (student_id, event_type, event_count) VALUES (?, ?, ?)'
+    ).run(session.userId, event || 'unknown', count || 1);
+  } catch {
+    // Non-critical, don't fail the request
   }
 
-  db.prepare(
-    'INSERT INTO violations (student_id, assessment_id, type) VALUES (?, ?, ?)'
-  ).run(session.userId, assessment.id, event || 'tab_switch');
-
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ success: true });
 }

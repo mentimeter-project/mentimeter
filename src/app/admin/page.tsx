@@ -35,6 +35,22 @@ export default function AdminDashboard() {
     fetchAssessments();
   };
 
+  const deleteAssessment = async (id: number, title: string) => {
+    if (!confirm(`Delete "${title}"?\n\nThis will permanently delete the assessment and all student responses. This cannot be undone.`)) return;
+
+    const res = await fetch('/api/admin/delete-assessment', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ assessmentId: id }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      alert(data.error || 'Failed to delete');
+      return;
+    }
+    fetchAssessments();
+  };
+
   const logout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     router.push('/');
@@ -132,29 +148,33 @@ export default function AdminDashboard() {
                   </div>
                 )}
               </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <button onClick={() => toggleActive(a.id, a.is_active)}
-                  className={`px-4 py-2 rounded-xl text-xs font-semibold transition-colors ${
-                    a.is_active
-                      ? 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100'
-                      : 'bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100'
-                  }`}>
-                  {a.is_active ? '■ Stop' : '▶ Launch'}
-                </button>
-                {a.is_active && (
-                  <Link href={`/admin/monitor/${a.id}`}
-                    className="px-4 py-2 rounded-xl text-xs font-semibold bg-violet-50 text-violet-600 border border-violet-200 hover:bg-violet-100 transition-colors">
-                    👁 Monitor
-                  </Link>
-                )}
-                <Link href={`/admin/review/${a.id}`}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100 transition-colors">
-                  Review
+              <div className="flex gap-2 flex-wrap">
+                <Link href={`/admin/monitor/${a.id}`}
+                  className="text-xs font-semibold px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 transition-colors">
+                  👁 Monitor
                 </Link>
                 <Link href={`/admin/leaderboard/${a.id}`}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-50 text-indigo-600 border border-indigo-200 hover:bg-indigo-100 transition-colors">
-                  🏆
+                  className="text-xs font-semibold px-3 py-1.5 rounded-xl border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors">
+                  🏆 Leaderboard
                 </Link>
+                <Link href={`/admin/review/${a.id}`}
+                  className="text-xs font-semibold px-3 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors">
+                  ✍ Review
+                </Link>
+                <button onClick={() => toggleActive(a.id, a.is_active)}
+                  className={`text-xs font-semibold px-3 py-1.5 rounded-xl border transition-colors ${
+                    a.is_active
+                      ? 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100'
+                      : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                  }`}>
+                  {a.is_active ? '⏹ Stop' : '▶ Go Live'}
+                </button>
+                {!a.is_active && (
+                  <button onClick={() => deleteAssessment(a.id, a.title)}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-xl border border-red-200 bg-red-50 text-red-500 hover:bg-red-100 transition-colors">
+                    🗑 Delete
+                  </button>
+                )}
               </div>
             </div>
           ))}

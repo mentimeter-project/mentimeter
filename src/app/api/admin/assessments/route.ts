@@ -6,14 +6,26 @@ import { sessionOptions, SessionData } from '@/lib/session';
 
 export async function GET() {
   const session = await getIronSession<SessionData>(cookies(), sessionOptions);
-  if (session.role !== 'admin') return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+  if (session.role !== 'admin') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+  }
 
   const assessments = db.prepare(`
-    SELECT a.*,
+    SELECT
+      a.*,
       (SELECT COUNT(*) FROM questions q WHERE q.assessment_id = a.id) as question_count,
-      (SELECT COUNT(DISTINCT r.student_id) FROM responses r JOIN questions q ON r.question_id = q.id WHERE q.assessment_id = a.id) as response_count,
-      (SELECT COUNT(*) FROM responses r JOIN questions q ON r.question_id = q.id WHERE q.assessment_id = a.id AND r.reviewed = 0 AND r.answer_text != '') as pending_review
-    FROM assessments a ORDER BY a.created_at DESC
+      (SELECT COUNT(DISTINCT r.student_id)
+        FROM responses r
+        JOIN questions q ON r.question_id = q.id
+        WHERE q.assessment_id = a.id AND r.answer_text != ''
+      ) as response_count,
+      (SELECT COUNT(*)
+        FROM responses r
+        JOIN questions q ON r.question_id = q.id
+        WHERE q.assessment_id = a.id AND r.reviewed = 0 AND r.answer_text != ''
+      ) as pending_review
+    FROM assessments a
+    ORDER BY a.created_at DESC
   `).all();
 
   return NextResponse.json({ assessments });
