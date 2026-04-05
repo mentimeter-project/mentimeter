@@ -4,36 +4,99 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
-const emptyQ = () => ({ question_text: '', max_marks: 10 });
+// ── Types ──────────────────────────────────────────────────────────────────
+interface TestCase {
+  input: string;
+  expected_output: string;
+  marks: number;
+}
 
+interface Question {
+  question_text: string;
+  question_type: 'text' | 'code';
+  max_marks: number;
+  test_cases: TestCase[];
+}
+
+const emptyTestCase = (): TestCase => ({ input: '', expected_output: '', marks: 1 });
+const emptyQ = (): Question => ({
+  question_text: '',
+  question_type: 'text',
+  max_marks: 10,
+  test_cases: [],
+});
+
+// ── Component ──────────────────────────────────────────────────────────────
 export default function CreateAssessmentPage() {
   const router = useRouter();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [duration, setDuration] = useState(30);
-  const [questions, setQuestions] = useState([emptyQ()]);
+  const [questions, setQuestions] = useState<Question[]>([emptyQ()]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  const updateQ = (i: number, field: string, value: string | number) =>
+  // ── Question helpers ─────────────────────────────────────────────────────
+  const updateQ = (i: number, field: keyof Question, value: string | number) =>
     setQuestions(prev => prev.map((q, idx) => idx === i ? { ...q, [field]: value } : q));
 
+  const setQType = (i: number, type: 'text' | 'code') =>
+    setQuestions(prev => prev.map((q, idx) =>
+      idx === i ? { ...q, question_type: type, test_cases: type === 'code' && q.test_cases.length === 0 ? [emptyTestCase()] : q.test_cases } : q
+    ));
+
+  const addTestCase = (qIdx: number) =>
+    setQuestions(prev => prev.map((q, i) => i === qIdx ? { ...q, test_cases: [...q.test_cases, emptyTestCase()] } : q));
+
+  const removeTestCase = (qIdx: number, tcIdx: number) =>
+    setQuestions(prev => prev.map((q, i) => i === qIdx
+      ? { ...q, test_cases: q.test_cases.filter((_, ti) => ti !== tcIdx) }
+      : q
+    ));
+
+  const updateTestCase = (qIdx: number, tcIdx: number, field: keyof TestCase, value: string | number) =>
+    setQuestions(prev => prev.map((q, i) => i === qIdx
+      ? {
+          ...q,
+          test_cases: q.test_cases.map((tc, ti) => ti === tcIdx ? { ...tc, [field]: value } : tc),
+        }
+      : q
+    ));
+
+  // ── Submit ───────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
     if (!title.trim()) { setError('Title is required'); return; }
     if (questions.some(q => !q.question_text.trim())) { setError('All questions must have text'); return; }
+    // Validate coding questions have at least one test case with expected output
+    for (let i = 0; i < questions.length; i++) {
+      const q = questions[i];
+      if (q.question_type === 'code') {
+        if (q.test_cases.length === 0) {
+          setError(`Question ${i + 1} is a coding question but has no test cases`); return;
+        }
+        if (q.test_cases.some(tc => !tc.expected_output.trim())) {
+          setError(`Question ${i + 1}: all test cases must have an expected output`); return;
+        }
+      }
+    }
     setSubmitting(true);
+    setError('');
     const res = await fetch('/api/admin/create-assessment', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title, description, duration_minutes: duration, questions }),
     });
     const data = await res.json();
-    if (!res.ok) { setError(data.error); setSubmitting(false); return; }
+    if (!res.ok) { setError(data.error || 'Failed to create assessment'); setSubmitting(false); return; }
     router.push('/admin');
   };
 
+  const inputClass = 'w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-800 text-sm placeholder-slate-300 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all';
+  const tcInputClass = 'flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-xs font-mono placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all';
+
   return (
     <div className="min-h-screen bg-slate-50">
-      <nav className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center shadow-sm">
+      {/* Nav */}
+      <nav className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center shadow-sm sticky top-0 z-10">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
             <span className="text-white font-black text-sm">M</span>
@@ -44,16 +107,17 @@ export default function CreateAssessmentPage() {
       </nav>
 
       <div className="max-w-3xl mx-auto p-6 space-y-4">
-        {/* Details Card */}
+        {/* Assessment Details */}
         <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
           <h2 className="font-semibold text-slate-700 text-sm uppercase tracking-wider">Assessment Details</h2>
           <input
+            id="assessment-title"
             placeholder="Assessment title" value={title} onChange={e => setTitle(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-800 text-sm placeholder-slate-300 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all"
+            className={inputClass}
           />
           <textarea
             placeholder="Description (optional)" value={description} onChange={e => setDescription(e.target.value)} rows={2}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-800 text-sm placeholder-slate-300 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all resize-none"
+            className={`${inputClass} resize-none`}
           />
           <div className="flex items-center gap-3">
             <label className="text-sm text-slate-500 font-medium">Duration (minutes):</label>
@@ -66,7 +130,8 @@ export default function CreateAssessmentPage() {
 
         {/* Questions */}
         {questions.map((q, i) => (
-          <div key={i} className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-3">
+          <div key={i} className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+            {/* Question header */}
             <div className="flex justify-between items-center">
               <span className="text-indigo-600 text-xs font-bold uppercase tracking-wider">Question {i + 1}</span>
               {questions.length > 1 && (
@@ -76,18 +141,125 @@ export default function CreateAssessmentPage() {
                 </button>
               )}
             </div>
+
+            {/* Question text */}
             <textarea
               placeholder="Write your question here..." value={q.question_text}
               onChange={e => updateQ(i, 'question_text', e.target.value)} rows={3}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 text-sm placeholder-slate-300 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all resize-none"
+              className={`${inputClass} resize-none`}
             />
-            <div className="flex items-center gap-3">
-              <label className="text-sm text-slate-500 font-medium">Max Marks:</label>
-              <input
-                type="number" value={q.max_marks} onChange={e => updateQ(i, 'max_marks', parseInt(e.target.value))} min={1} max={100}
-                className="w-20 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-slate-800 text-sm focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-              />
+
+            {/* Type selector + max marks */}
+            <div className="flex flex-wrap items-center gap-4">
+              {/* Question type toggle */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-slate-500 font-medium">Type:</span>
+                <div className="flex rounded-xl border border-slate-200 overflow-hidden">
+                  <button
+                    onClick={() => setQType(i, 'text')}
+                    className={`px-4 py-1.5 text-xs font-semibold transition-all ${
+                      q.question_type === 'text'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-white text-slate-500 hover:bg-slate-50'
+                    }`}
+                  >
+                    📝 Text Answer
+                  </button>
+                  <button
+                    onClick={() => setQType(i, 'code')}
+                    className={`px-4 py-1.5 text-xs font-semibold transition-all border-l border-slate-200 ${
+                      q.question_type === 'code'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-white text-slate-500 hover:bg-slate-50'
+                    }`}
+                  >
+                    💻 Coding
+                  </button>
+                </div>
+              </div>
+
+              {/* Max marks */}
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-slate-500 font-medium">Max Marks:</label>
+                <input
+                  type="number" value={q.max_marks}
+                  onChange={e => updateQ(i, 'max_marks', parseInt(e.target.value))} min={1} max={100}
+                  className="w-20 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-slate-800 text-sm focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                />
+              </div>
             </div>
+
+            {/* Test Cases (coding questions only) */}
+            {q.question_type === 'code' && (
+              <div className="bg-slate-900 rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-slate-300 text-xs font-semibold uppercase tracking-wider">
+                    🧪 Hidden Test Cases
+                    <span className="text-slate-500 font-normal ml-2">(students cannot see these)</span>
+                  </p>
+                  <span className="text-slate-500 text-xs">{q.test_cases.length} case{q.test_cases.length !== 1 ? 's' : ''}</span>
+                </div>
+
+                {q.test_cases.length === 0 && (
+                  <p className="text-slate-500 text-xs text-center py-3">
+                    Add at least one test case to evaluate student code.
+                  </p>
+                )}
+
+                {q.test_cases.map((tc, ti) => (
+                  <div key={ti} className="bg-slate-800 rounded-lg p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-indigo-400 text-xs font-semibold">Test Case {ti + 1}</span>
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1.5">
+                          <label className="text-slate-400 text-xs">Marks:</label>
+                          <input
+                            type="number" value={tc.marks} min={1} max={50}
+                            onChange={e => updateTestCase(i, ti, 'marks', parseInt(e.target.value) || 1)}
+                            className="w-14 bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-slate-200 text-xs focus:outline-none focus:border-indigo-500"
+                          />
+                        </div>
+                        {q.test_cases.length > 1 && (
+                          <button onClick={() => removeTestCase(i, ti)}
+                            className="text-red-400 hover:text-red-300 text-xs font-medium transition-colors">
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-slate-500 text-xs block mb-1">stdin (input)</label>
+                        <textarea
+                          value={tc.input}
+                          onChange={e => updateTestCase(i, ti, 'input', e.target.value)}
+                          rows={2}
+                          placeholder="(leave empty if no input)"
+                          className={`${tcInputClass} w-full resize-none`}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-slate-500 text-xs block mb-1">stdout (expected output) *</label>
+                        <textarea
+                          value={tc.expected_output}
+                          onChange={e => updateTestCase(i, ti, 'expected_output', e.target.value)}
+                          rows={2}
+                          placeholder="Expected output..."
+                          className={`${tcInputClass} w-full resize-none`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                <button
+                  onClick={() => addTestCase(i)}
+                  className="w-full border border-dashed border-slate-600 hover:border-indigo-500 text-slate-500 hover:text-indigo-400 rounded-lg py-2 text-xs font-medium transition-all"
+                >
+                  + Add Test Case
+                </button>
+              </div>
+            )}
           </div>
         ))}
 

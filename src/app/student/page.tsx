@@ -2,6 +2,11 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
+import { LANGUAGES, type Language } from '@/components/CodeEditor';
+import EvalResultCard, { EvalResultSkeleton } from '@/components/EvalResultCard';
+
+const CodeEditor = dynamic(() => import('@/components/CodeEditor'), { ssr: false });
 
 type Tab = 'questions' | 'leaderboard';
 
@@ -15,6 +20,10 @@ export default function StudentPage() {
   const [draftAnswers, setDraftAnswers] = useState<Record<number, string>>({});
   const [saving, setSaving] = useState<number | null>(null);
   const [savedAt, setSavedAt] = useState<Record<number, string>>({});
+  // ── Code question state ──
+  const [codeDrafts, setCodeDrafts] = useState<Record<number, { code: string; languageId: number }>>({});
+  const [evaluating, setEvaluating] = useState<number | null>(null);
+  const [evalResults, setEvalResults] = useState<Record<number, any>>({});
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [currentUser, setCurrentUser] = useState('');
   const [name, setName] = useState('');
@@ -119,6 +128,38 @@ export default function StudentPage() {
     setAnsweredMap(prev => ({ ...prev, [questionId]: { answer_text: text } }));
     setSavedAt(prev => ({ ...prev, [questionId]: new Date().toLocaleTimeString() }));
     setSaving(null);
+  };
+
+  const evaluateCode = async (questionId: number) => {
+    const draft = codeDrafts[questionId];
+    if (!draft?.code?.trim()) return;
+    setEvaluating(questionId);
+    try {
+      const res = await fetch('/api/student/evaluate-submission', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          questionId,
+          languageId: draft.languageId,
+          sourceCode: draft.code,
+        }),
+      });
+      const data = await res.json();
+      if (data.alreadySubmitted) {
+        setEvalResults(prev => ({ ...prev, [questionId]: { error: 'You have already submitted this question.' } }));
+        return;
+      }
+      setEvalResults(prev => ({ ...prev, [questionId]: data }));
+      if (!data.error) {
+        setAnsweredMap(prev => ({ ...prev, [questionId]: { answer_text: draft.code, marks_awarded: data.score, reviewed: 1 } }));
+        setSavedAt(prev => ({ ...prev, [questionId]: new Date().toLocaleTimeString() }));
+      }
+    } catch {
+      setEvalResults(prev => ({ ...prev, [questionId]: { error: 'Network error. Please try again.' } }));
+    } finally {
+      setEvaluating(false as any);
+      setEvaluating(null);
+    }
   };
 
   const handleSubmitAll = async (forced = false) => {
@@ -394,40 +435,120 @@ export default function StudentPage() {
                       </div>
 
                       {/* Answer Box */}
-                      <div className="space-y-3">
-                        <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
-                          Your Answer
-                        </label>
-                        <textarea
-                          value={draft}
-                          onChange={e => setDraftAnswers(prev => ({ ...prev, [qid]: e.target.value }))}
-                          disabled={isSubmitted}
-                          rows={8}
-                          placeholder="Type your answer here..."
-                          className={`w-full border rounded-2xl px-5 py-4 text-slate-800 text-sm leading-relaxed focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all resize-none ${
-                            isSubmitted
-                              ? 'bg-slate-50 border-slate-200 text-slate-500 cursor-not-allowed'
-                              : 'bg-white border-slate-200 hover:border-slate-300'
-                          }`}
-                        />
-                        <div className="flex items-center justify-between">
-                          <div>
-                            {savedAt[qid] && (
-                              <p className="text-xs text-emerald-600">✓ Saved at {savedAt[qid]}</p>
-                            )}
-                            {!isSubmitted && draft?.trim() && !savedAt[qid] && (
-                              <p className="text-xs text-slate-400">Unsaved changes</p>
+                      {q.question_type === 'code' ? (
+                        // ── Code Question ────────────────────────────────────
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between">
+                            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
+                              Your Code
+                            </label>
+                            {isSubmitted && (
+                              <span className="bg-emerald-900/40 text-emerald-400 border border-emerald-500/30 text-xs px-2.5 py-1 rounded-full font-medium">
+                                ✓ Submitted
+                              </span>
                             )}
                           </div>
+
+                          <CodeEditor
+                            value={codeDrafts[qid]?.code ?? (isSubmitted ? (submitted?.answer_text as string ?? '') : (LANGUAGES[0].boilerplate))}
+                            languageId={codeDrafts[qid]?.languageId ?? LANGUAGES[0].id}
+                            disabled={isSubmitted}
+                            onChange={(code) =>
+                              setCodeDrafts(prev => ({ ...prev, [qid]: { ...prev[qid], code, languageId: prev[qid]?.languageId ?? LANGUAGES[0].id } }))
+                            }
+                            onLanguageChange={(lang: Language) =>
+                              setCodeDrafts(prev => ({
+                                ...prev,
+                                [qid]: {
+                                  code: prev[qid]?.code ?? lang.boilerplate,
+                                  languageId: lang.id,
+                                },
+                              }))
+                            }
+                          />
+
+                          {/* Submit button + status */}
                           {!isSubmitted && (
-                            <button onClick={() => saveAnswer(qid)}
-                              disabled={saving === qid || !draft?.trim()}
-                              className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition-colors shadow-sm shadow-indigo-200 disabled:opacity-40">
-                              {saving === qid ? 'Saving...' : 'Save Answer'}
-                            </button>
+                            <div className="flex items-center justify-between pt-1">
+                              <div className="text-xs text-slate-400">
+                                {evaluating === qid && (
+                                  <span className="flex items-center gap-1.5 text-indigo-400">
+                                    <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                                    </svg>
+                                    Evaluating against test cases...
+                                  </span>
+                                )}
+                              </div>
+                              <button
+                                id={`submit-code-${qid}`}
+                                onClick={() => evaluateCode(qid)}
+                                disabled={evaluating === qid || !codeDrafts[qid]?.code?.trim()}
+                                className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition-all shadow-lg shadow-indigo-900/40 disabled:opacity-40 disabled:cursor-not-allowed"
+                              >
+                                {evaluating === qid ? (
+                                  <><svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Running...</>
+                                ) : (
+                                  <>▶ Run &amp; Submit</>
+                                )}
+                              </button>
+                            </div>
                           )}
+
+                          {/* Evaluation result card — show skeleton while evaluating, card once done */}
+                          {evaluating === qid ? (
+                            <EvalResultSkeleton />
+                          ) : evalResults[qid] ? (
+                            evalResults[qid].error ? (
+                              <div className="bg-red-950/40 border border-red-500/30 text-red-400 rounded-xl px-4 py-3 text-sm">
+                                ⚠️ {evalResults[qid].error}
+                              </div>
+                            ) : (
+                              <EvalResultCard
+                                result={evalResults[qid]}
+                                onDismiss={() => setEvalResults(prev => { const n = { ...prev }; delete n[qid]; return n; })}
+                              />
+                            )
+                          ) : null}
                         </div>
-                      </div>
+                      ) : (
+                        // ── Text Question (original UI) ───────────────────────
+                        <div className="space-y-3">
+                          <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
+                            Your Answer
+                          </label>
+                          <textarea
+                            value={draft}
+                            onChange={e => setDraftAnswers(prev => ({ ...prev, [qid]: e.target.value }))}
+                            disabled={isSubmitted}
+                            rows={8}
+                            placeholder="Type your answer here..."
+                            className={`w-full border rounded-2xl px-5 py-4 text-slate-800 text-sm leading-relaxed focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all resize-none ${
+                              isSubmitted
+                                ? 'bg-slate-50 border-slate-200 text-slate-500 cursor-not-allowed'
+                                : 'bg-white border-slate-200 hover:border-slate-300'
+                            }`}
+                          />
+                          <div className="flex items-center justify-between">
+                            <div>
+                              {savedAt[qid] && (
+                                <p className="text-xs text-emerald-600">✓ Saved at {savedAt[qid]}</p>
+                              )}
+                              {!isSubmitted && draft?.trim() && !savedAt[qid] && (
+                                <p className="text-xs text-slate-400">Unsaved changes</p>
+                              )}
+                            </div>
+                            {!isSubmitted && (
+                              <button onClick={() => saveAnswer(qid)}
+                                disabled={saving === qid || !draft?.trim()}
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition-colors shadow-sm shadow-indigo-200 disabled:opacity-40">
+                                {saving === qid ? 'Saving...' : 'Save Answer'}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
 
                       {/* Navigation */}
                       <div className="flex gap-3 mt-8 pt-6 border-t border-slate-100">

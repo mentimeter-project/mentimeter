@@ -19,7 +19,7 @@ export async function GET() {
   }
 
   const questions = db.prepare(
-    'SELECT id, question_text, max_marks, order_index FROM questions WHERE assessment_id = ? ORDER BY order_index ASC'
+    'SELECT id, question_text, question_type, max_marks, order_index FROM questions WHERE assessment_id = ? ORDER BY order_index ASC'
   ).all(assessment.id as number);
 
   const existingResponses = db.prepare(`

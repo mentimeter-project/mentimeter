@@ -37,9 +37,34 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     assessment_id INTEGER NOT NULL,
     question_text TEXT NOT NULL,
+    question_type TEXT DEFAULT 'text',
     max_marks INTEGER DEFAULT 10,
     order_index INTEGER DEFAULT 0,
     FOREIGN KEY (assessment_id) REFERENCES assessments(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS test_cases (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    question_id INTEGER NOT NULL,
+    input TEXT NOT NULL DEFAULT '',
+    expected_output TEXT NOT NULL,
+    marks INTEGER DEFAULT 1,
+    FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS code_submissions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    student_id INTEGER NOT NULL,
+    question_id INTEGER NOT NULL,
+    language_id INTEGER NOT NULL,
+    source_code TEXT NOT NULL,
+    score INTEGER DEFAULT 0,
+    test_cases_passed INTEGER DEFAULT 0,
+    total_test_cases INTEGER DEFAULT 0,
+    compilation_error TEXT DEFAULT NULL,
+    submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (student_id) REFERENCES students(id),
+    FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE
   );
 
   CREATE TABLE IF NOT EXISTS responses (
@@ -63,6 +88,13 @@ db.exec(`
     logged_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 `);
+
+// ── SCHEMA MIGRATIONS (idempotent ALTER TABLE) ──
+const existingQCols = (db.pragma('table_info(questions)') as { name: string }[]).map(c => c.name);
+if (!existingQCols.includes('question_type')) {
+  db.exec(`ALTER TABLE questions ADD COLUMN question_type TEXT DEFAULT 'text'`);
+  console.log('✅ Migration: added question_type to questions');
+}
 
 // Enable foreign keys for CASCADE deletes
 db.pragma('foreign_keys = ON');
@@ -138,7 +170,7 @@ const ALL_STUDENTS = [
   { name: 'Thanush Gowda S',           usn: '1JB23AI057' },
   { name: 'Tharun K N',                usn: '1JB23AI058' },
   { name: 'Thejas B U',                usn: '1JB23AI059' },
-  { name: 'Uthsavi D U',              usn: '1JB23AI060' },
+  { name: 'Uthsavi D U',               usn: '1JB23AI060' },
   { name: 'Vijay S',                   usn: '1JB24AI405' },
   { name: 'Vinesh Mullai G',           usn: '1JB23AI061' },
   { name: 'Yashas Rao Jadhav',         usn: '1JB23AI062' },
