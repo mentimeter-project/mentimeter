@@ -90,26 +90,26 @@ export default function CreateAssessmentPage() {
     router.push('/admin');
   };
 
-  const inputClass = 'w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-800 text-sm placeholder-slate-300 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all';
-  const tcInputClass = 'flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-xs font-mono placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all';
+  const inputClass = 'w-full bg-white/50 dark:bg-slate-700/50 border border-slate-200/60 dark:border-slate-600/40 rounded-xl px-4 py-2.5 text-slate-800 dark:text-white text-sm placeholder-slate-300 dark:placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 transition-all';
+  const tcInputClass = 'flex-1 bg-slate-800 dark:bg-slate-900 border border-slate-700 dark:border-slate-600 rounded-lg px-3 py-2 text-slate-200 text-xs font-mono placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all';
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950 animate-fade-in">
       {/* Nav */}
-      <nav className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center shadow-sm sticky top-0 z-10">
+      <nav className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border-b border-white/30 dark:border-slate-700/40 px-6 py-4 flex justify-between items-center shadow-sm sticky top-0 z-10">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
+          <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center shadow-md shadow-indigo-500/20">
             <span className="text-white font-black text-sm">M</span>
           </div>
-          <span className="font-bold text-slate-800">Create Assessment</span>
+          <span className="font-bold text-slate-800 dark:text-white">Create Assessment</span>
         </div>
-        <Link href="/admin" className="text-slate-400 hover:text-slate-600 text-sm font-medium">← Back</Link>
+        <Link href="/admin" className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 text-sm font-medium transition-colors">← Back</Link>
       </nav>
 
       <div className="max-w-3xl mx-auto p-6 space-y-4">
         {/* Assessment Details */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
-          <h2 className="font-semibold text-slate-700 text-sm uppercase tracking-wider">Assessment Details</h2>
+        <div className="bg-white/70 dark:bg-slate-800/50 backdrop-blur-lg border border-white/30 dark:border-slate-700/40 rounded-2xl p-6 shadow-sm space-y-4">
+          <h2 className="font-semibold text-slate-700 dark:text-slate-200 text-sm uppercase tracking-wider">Assessment Details</h2>
           <input
             id="assessment-title"
             placeholder="Assessment title" value={title} onChange={e => setTitle(e.target.value)}
@@ -120,23 +120,23 @@ export default function CreateAssessmentPage() {
             className={`${inputClass} resize-none`}
           />
           <div className="flex items-center gap-3">
-            <label className="text-sm text-slate-500 font-medium">Duration (minutes):</label>
+            <label className="text-sm text-slate-500 dark:text-slate-400 font-medium">Duration (minutes):</label>
             <input
               type="number" value={duration} onChange={e => setDuration(parseInt(e.target.value))} min={5} max={180}
-              className="w-24 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 text-sm focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+              className="w-24 bg-white/50 dark:bg-slate-700/50 border border-slate-200/60 dark:border-slate-600/40 rounded-xl px-3 py-2 text-slate-800 dark:text-white text-sm focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 transition-all"
             />
           </div>
         </div>
 
         {/* Questions */}
         {questions.map((q, i) => (
-          <div key={i} className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+          <div key={i} className="bg-white/70 dark:bg-slate-800/50 backdrop-blur-lg border border-white/30 dark:border-slate-700/40 rounded-2xl p-6 shadow-sm space-y-4">
             {/* Question header */}
             <div className="flex justify-between items-center">
-              <span className="text-indigo-600 text-xs font-bold uppercase tracking-wider">Question {i + 1}</span>
+              <span className="text-indigo-600 dark:text-indigo-400 text-xs font-bold uppercase tracking-wider">Question {i + 1}</span>
               {questions.length > 1 && (
                 <button onClick={() => setQuestions(p => p.filter((_, idx) => idx !== i))}
-                  className="text-red-400 hover:text-red-600 text-xs font-medium transition-colors">
+                  className="text-red-400 dark:text-red-500 hover:text-red-600 dark:hover:text-red-400 text-xs font-medium transition-colors">
                   Remove
                 </button>
               )}
@@ -153,24 +153,24 @@ export default function CreateAssessmentPage() {
             <div className="flex flex-wrap items-center gap-4">
               {/* Question type toggle */}
               <div className="flex items-center gap-2">
-                <span className="text-sm text-slate-500 font-medium">Type:</span>
-                <div className="flex rounded-xl border border-slate-200 overflow-hidden">
+                <span className="text-sm text-slate-500 dark:text-slate-400 font-medium">Type:</span>
+                <div className="flex rounded-xl border border-slate-200 dark:border-slate-600 overflow-hidden">
                   <button
                     onClick={() => setQType(i, 'text')}
                     className={`px-4 py-1.5 text-xs font-semibold transition-all ${
                       q.question_type === 'text'
-                        ? 'bg-indigo-600 text-white'
-                        : 'bg-white text-slate-500 hover:bg-slate-50'
+                        ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white'
+                        : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
                     }`}
                   >
                     📝 Text Answer
                   </button>
                   <button
                     onClick={() => setQType(i, 'code')}
-                    className={`px-4 py-1.5 text-xs font-semibold transition-all border-l border-slate-200 ${
+                    className={`px-4 py-1.5 text-xs font-semibold transition-all border-l border-slate-200 dark:border-slate-600 ${
                       q.question_type === 'code'
-                        ? 'bg-indigo-600 text-white'
-                        : 'bg-white text-slate-500 hover:bg-slate-50'
+                        ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white'
+                        : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
                     }`}
                   >
                     💻 Coding
@@ -180,18 +180,18 @@ export default function CreateAssessmentPage() {
 
               {/* Max marks */}
               <div className="flex items-center gap-2">
-                <label className="text-sm text-slate-500 font-medium">Max Marks:</label>
+                <label className="text-sm text-slate-500 dark:text-slate-400 font-medium">Max Marks:</label>
                 <input
                   type="number" value={q.max_marks}
                   onChange={e => updateQ(i, 'max_marks', parseInt(e.target.value))} min={1} max={100}
-                  className="w-20 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-slate-800 text-sm focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                  className="w-20 bg-white/50 dark:bg-slate-700/50 border border-slate-200/60 dark:border-slate-600/40 rounded-xl px-3 py-1.5 text-slate-800 dark:text-white text-sm focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 transition-all"
                 />
               </div>
             </div>
 
             {/* Test Cases (coding questions only) */}
             {q.question_type === 'code' && (
-              <div className="bg-slate-900 rounded-xl p-4 space-y-3">
+              <div className="bg-slate-900 dark:bg-slate-950 rounded-xl p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <p className="text-slate-300 text-xs font-semibold uppercase tracking-wider">
                     🧪 Hidden Test Cases
@@ -207,7 +207,7 @@ export default function CreateAssessmentPage() {
                 )}
 
                 {q.test_cases.map((tc, ti) => (
-                  <div key={ti} className="bg-slate-800 rounded-lg p-3 space-y-2">
+                  <div key={ti} className="bg-slate-800 dark:bg-slate-900/80 rounded-lg p-3 space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-indigo-400 text-xs font-semibold">Test Case {ti + 1}</span>
                       <div className="flex items-center gap-3">
@@ -265,14 +265,14 @@ export default function CreateAssessmentPage() {
 
         <button
           onClick={() => setQuestions(p => [...p, emptyQ()])}
-          className="w-full border-2 border-dashed border-slate-300 hover:border-indigo-400 text-slate-400 hover:text-indigo-600 rounded-2xl py-4 text-sm font-semibold transition-all">
+          className="w-full border-2 border-dashed border-slate-300 dark:border-slate-600 hover:border-indigo-400 dark:hover:border-indigo-500 text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-2xl py-4 text-sm font-semibold transition-all">
           + Add Question
         </button>
 
-        {error && <div className="bg-red-50 border border-red-100 text-red-600 text-sm px-4 py-3 rounded-xl">{error}</div>}
+        {error && <div className="bg-red-50 dark:bg-red-900/30 border border-red-100 dark:border-red-800/50 text-red-600 dark:text-red-400 text-sm px-4 py-3 rounded-xl">{error}</div>}
 
         <button onClick={handleSubmit} disabled={submitting}
-          className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 rounded-2xl transition-colors shadow-md shadow-indigo-200 disabled:opacity-50">
+          className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 active:scale-[0.98] text-white font-bold py-3.5 rounded-2xl transition-all shadow-lg shadow-indigo-500/25 disabled:opacity-50 hover:scale-[1.01]">
           {submitting ? 'Creating...' : 'Create Assessment'}
         </button>
       </div>

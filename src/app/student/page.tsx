@@ -10,6 +10,18 @@ const CodeEditor = dynamic(() => import('@/components/CodeEditor'), { ssr: false
 
 type Tab = 'questions' | 'leaderboard';
 
+// Motivational messages based on progress
+const getEncouragement = (answered: number, total: number, timeLeft: number | null) => {
+  if (total === 0) return '';
+  const pct = answered / total;
+  if (pct === 1) return '🎯 All questions answered! Review and submit when ready.';
+  if (pct >= 0.75) return '🔥 Almost there! Just a few more to go.';
+  if (pct >= 0.5) return '💪 Halfway done — great progress!';
+  if (pct >= 0.25) return '📝 Good start! Keep the momentum going.';
+  if (timeLeft !== null && timeLeft < 300) return '⏰ Time is running low — focus on what you know!';
+  return '✨ Take your time, read carefully, and do your best.';
+};
+
 export default function StudentPage() {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>('questions');
@@ -34,9 +46,23 @@ export default function StudentPage() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [allSubmitted, setAllSubmitted] = useState(false);
+  const [dark, setDark] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number | null>(null);
   const tabSwitchRef = useRef(0);
+
+  useEffect(() => {
+    setDark(document.documentElement.classList.contains('dark'));
+  }, []);
+
+  const toggleDark = () => {
+    document.documentElement.classList.add('transitioning');
+    document.documentElement.classList.toggle('dark');
+    const isDark = document.documentElement.classList.contains('dark');
+    setDark(isDark);
+    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    setTimeout(() => document.documentElement.classList.remove('transitioning'), 350);
+  };
 
   const fetchAssessment = useCallback(async () => {
     const res = await fetch('/api/student/active-assessment');
@@ -195,22 +221,25 @@ export default function StudentPage() {
   const myScore = (leaderboard.find(s => s.name === currentUser)?.score as number) || 0;
   const isWarning = timeLeft !== null && timeLeft < 300;
   const isDanger = timeLeft !== null && timeLeft < 60;
+  const firstName = name ? name.split('.')[0].charAt(0).toUpperCase() + name.split('.')[0].slice(1) : '';
 
   // All submitted screen
   if (allSubmitted) {
     return (
-      <div className="h-screen bg-slate-50 flex items-center justify-center">
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-xl p-12 text-center max-w-md">
+      <div className="h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950 flex items-center justify-center animate-fade-in relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-emerald-400/20 to-teal-400/10 dark:from-emerald-600/10 dark:to-teal-600/5 rounded-full blur-3xl" />
+        <div className="bg-white/70 dark:bg-slate-800/60 backdrop-blur-xl border border-white/30 dark:border-slate-700/50 rounded-2xl shadow-xl shadow-indigo-100/40 dark:shadow-black/20 p-12 text-center max-w-md transition-all animate-slide-up relative z-10">
           <div className="text-6xl mb-4">🎉</div>
-          <h2 className="text-2xl font-bold text-slate-800 mb-2">Assessment Submitted!</h2>
-          <p className="text-slate-400 text-sm mb-6">Your answers have been submitted successfully. Your teacher will review them shortly.</p>
+          <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-2">Well done{firstName ? `, ${firstName}` : ''}!</h2>
+          <p className="text-slate-500 dark:text-slate-400 text-sm mb-2">Your assessment has been submitted successfully.</p>
+          <p className="text-slate-400 dark:text-slate-500 text-xs mb-6">Your teacher will review your answers shortly. Great effort! 💪</p>
           {myRank > 0 && (
-            <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 mb-6">
-              <p className="text-indigo-600 font-semibold">Current Rank: #{myRank}</p>
-              <p className="text-slate-400 text-sm">{myScore} points so far</p>
+            <div className="bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-700/50 rounded-xl p-4 mb-6">
+              <p className="text-indigo-600 dark:text-indigo-400 font-semibold">Current Rank: #{myRank}</p>
+              <p className="text-slate-400 dark:text-slate-500 text-sm">{myScore} points earned</p>
             </div>
           )}
-          <button onClick={logout} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition-colors">
+          <button onClick={logout} className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 active:scale-95 text-white font-semibold px-8 py-3 rounded-xl text-sm transition-all hover:scale-[1.02] shadow-lg shadow-indigo-500/25">
             Logout
           </button>
         </div>
@@ -219,7 +248,7 @@ export default function StudentPage() {
   }
 
   return (
-    <div className="h-screen bg-slate-50 flex flex-col overflow-hidden">
+    <div className="h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950 flex flex-col overflow-hidden animate-fade-in">
       {/* Warning Banner */}
       {showWarningBanner && (
         <div className={`flex-shrink-0 flex items-center justify-between px-6 py-2 text-sm font-medium ${
@@ -236,23 +265,23 @@ export default function StudentPage() {
 
       {/* Submit Confirm Modal */}
       {showSubmitConfirm && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full">
-            <h3 className="text-lg font-bold text-slate-800 mb-2">Submit Assessment?</h3>
-            <p className="text-slate-500 text-sm mb-2">
+        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl dark:shadow-black/40 p-8 max-w-sm w-full border border-white/50 dark:border-slate-700/50 animate-slide-up">
+            <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-2">Submit Assessment?</h3>
+            <p className="text-slate-500 dark:text-slate-400 text-sm mb-2">
               You have answered <strong>{answeredCount}</strong> of <strong>{questions.length}</strong> questions.
             </p>
             {answeredCount < questions.length && (
-              <p className="text-amber-600 text-sm mb-4">⚠️ {questions.length - answeredCount} question(s) are unanswered.</p>
+              <p className="text-amber-600 dark:text-amber-400 text-sm mb-4">⚠️ {questions.length - answeredCount} question(s) are unanswered.</p>
             )}
-            <p className="text-slate-400 text-xs mb-6">Once submitted, you cannot change your answers.</p>
+            <p className="text-slate-400 dark:text-slate-500 text-xs mb-6">Once submitted, you cannot change your answers.</p>
             <div className="flex gap-3">
               <button onClick={() => setShowSubmitConfirm(false)}
-                className="flex-1 border border-slate-200 text-slate-600 font-semibold py-2.5 rounded-xl text-sm hover:bg-slate-50 transition-colors">
+                className="flex-1 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 font-semibold py-2.5 rounded-xl text-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
                 Cancel
               </button>
               <button onClick={() => handleSubmitAll(true)}
-                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-xl text-sm transition-colors">
+                className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold py-2.5 rounded-xl text-sm transition-all shadow-lg shadow-indigo-500/25">
                 Submit All
               </button>
             </div>
@@ -261,61 +290,69 @@ export default function StudentPage() {
       )}
 
       {/* Top Nav */}
-      <nav className="bg-white border-b border-slate-200 px-6 py-3 flex justify-between items-center flex-shrink-0 shadow-sm z-10">
+      <nav className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border-b border-white/30 dark:border-slate-700/40 px-6 py-3 flex justify-between items-center flex-shrink-0 shadow-sm z-10">
         <div className="flex items-center gap-3">
-          <div className="w-7 h-7 bg-indigo-600 rounded-lg flex items-center justify-center">
+          <div className="w-7 h-7 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center shadow-md shadow-indigo-500/20">
             <span className="text-white font-black text-xs">M</span>
           </div>
-          <span className="font-bold text-slate-800 text-sm">Mentimeter</span>
+          <span className="font-bold text-slate-800 dark:text-white text-sm">Mentimeter</span>
           {assessment && (
-            <span className="text-slate-400 text-xs hidden sm:block">· {assessment.title as string}</span>
+            <span className="text-slate-400 dark:text-slate-500 text-xs hidden sm:block">· {assessment.title as string}</span>
           )}
         </div>
         <div className="flex items-center gap-4">
+          {/* Dark mode toggle */}
+          <button onClick={toggleDark}
+            className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-sm hover:scale-110 active:scale-95 transition-all border border-slate-200/50 dark:border-slate-600/50"
+            aria-label="Toggle dark mode">
+            {dark ? '☀️' : '🌙'}
+          </button>
           {/* Fullscreen button */}
           {!isFullscreen && assessment && (
             <button onClick={requestFullscreen}
-              className="text-slate-400 hover:text-slate-600 text-xs font-medium border border-slate-200 px-2.5 py-1 rounded-lg transition-colors">
+              className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 text-xs font-medium border border-slate-200 dark:border-slate-600 px-2.5 py-1 rounded-lg transition-colors">
               ⛶ Fullscreen
             </button>
           )}
           {/* Timer */}
           {timeLeft !== null && (
             <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-mono font-bold ${
-              isDanger ? 'bg-red-50 text-red-600 border border-red-200 animate-pulse' :
-              isWarning ? 'bg-amber-50 text-amber-600 border border-amber-200' :
-              'bg-slate-100 text-slate-700 border border-slate-200'
+              isDanger ? 'bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-700/50 animate-pulse' :
+              isWarning ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-700/50' :
+              'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600'
             }`}>
               ⏱ {formatTime(timeLeft)}
             </div>
           )}
           {/* Progress */}
           {assessment && (
-            <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500">
-              <div className="w-20 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                <div className="h-full bg-indigo-500 rounded-full transition-all"
+            <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+              <div className="w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-500"
                   style={{ width: `${questions.length ? (answeredCount / questions.length) * 100 : 0}%` }} />
               </div>
               <span>{answeredCount}/{questions.length}</span>
             </div>
           )}
           {myRank > 0 && (
-            <span className="text-xs text-slate-500 hidden sm:block">
-              #{myRank} · <span className="text-indigo-600 font-semibold">{myScore}pts</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">
+              #{myRank} · <span className="text-indigo-600 dark:text-indigo-400 font-semibold">{myScore}pts</span>
             </span>
           )}
-          <span className="text-slate-500 text-xs hidden sm:block font-medium">{name}</span>
-          <button onClick={logout} className="text-slate-400 hover:text-slate-600 text-xs font-medium transition-colors">Logout</button>
+          <span className="text-slate-600 dark:text-slate-300 text-xs hidden sm:block font-semibold">
+            {firstName ? `Hi, ${firstName}!` : name}
+          </span>
+          <button onClick={logout} className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 text-xs font-medium transition-colors">Logout</button>
         </div>
       </nav>
 
       {/* Tabs */}
-      <div className="bg-white border-b border-slate-200 px-6 flex-shrink-0">
+      <div className="bg-white/70 dark:bg-slate-900/50 backdrop-blur-md border-b border-white/30 dark:border-slate-700/40 px-6 flex-shrink-0">
         <div className="flex gap-0">
           {([['questions', '📝 Questions'], ['leaderboard', '🏆 Leaderboard']] as const).map(([t, label]) => (
             <button key={t} onClick={() => setTab(t)}
               className={`px-5 py-3 text-sm font-semibold border-b-2 transition-all -mb-px ${
-                tab === t ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'
+                tab === t ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'border-transparent text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'
               }`}>
               {label}
             </button>
@@ -328,31 +365,37 @@ export default function StudentPage() {
         <div className="flex flex-1 overflow-hidden">
           {!loading && !assessment ? (
             <div className="flex-1 flex items-center justify-center">
-              <div className="text-center">
+              <div className="text-center animate-slide-up">
                 <div className="text-6xl mb-4">⏳</div>
-                <h2 className="text-xl font-bold text-slate-700 mb-2">Waiting for assessment...</h2>
-                <p className="text-slate-400 text-sm">Your teacher will launch one soon. This page refreshes automatically.</p>
+                <h2 className="text-xl font-bold text-slate-700 dark:text-slate-200 mb-2">
+                  {firstName ? `Hey ${firstName}!` : 'Hey!'} Waiting for assessment...
+                </h2>
+                <p className="text-slate-400 dark:text-slate-500 text-sm">Your teacher will launch one soon. This page refreshes automatically.</p>
               </div>
             </div>
           ) : assessment && (
             <>
               {/* Left Sidebar */}
-              <div className="w-60 bg-white border-r border-slate-200 flex flex-col flex-shrink-0">
-                <div className="p-4 border-b border-slate-100">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Progress</p>
-                  <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden mb-2">
-                    <div className="h-full bg-indigo-500 rounded-full transition-all"
+              <div className="w-64 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm border-r border-white/30 dark:border-slate-700/40 flex flex-col flex-shrink-0">
+                {/* Greeting + Progress */}
+                <div className="p-4 border-b border-slate-100 dark:border-slate-700/50">
+                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">
+                    {firstName ? `Go ${firstName}! 🚀` : 'Keep going! 🚀'}
+                  </p>
+                  <div className="h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mb-2">
+                    <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-500"
                       style={{ width: `${questions.length ? (answeredCount / questions.length) * 100 : 0}%` }} />
                   </div>
-                  <p className="text-xs text-slate-400">{answeredCount} of {questions.length} answered</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{answeredCount} of {questions.length} answered</p>
+                  <p className="text-xs text-indigo-500 dark:text-indigo-400 mt-1 italic">{getEncouragement(answeredCount, questions.length, timeLeft)}</p>
                 </div>
                 {/* Legend */}
-                <div className="px-4 py-3 border-b border-slate-100 flex gap-3 text-xs text-slate-400">
+                <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700/50 flex gap-3 text-xs text-slate-400 dark:text-slate-500">
                   <span className="flex items-center gap-1">
                     <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block" />Answered
                   </span>
                   <span className="flex items-center gap-1">
-                    <span className="w-2.5 h-2.5 rounded-sm bg-slate-200 inline-block" />Not yet
+                    <span className="w-2.5 h-2.5 rounded-sm bg-slate-200 dark:bg-slate-600 inline-block" />Not yet
                   </span>
                 </div>
                 {/* Question List */}
@@ -362,15 +405,15 @@ export default function StudentPage() {
                     const isActive = i === activeQ;
                     return (
                       <button key={q.id as number} onClick={() => setActiveQ(i)}
-                        className={`w-full text-left px-3 py-2.5 rounded-xl text-xs transition-all flex items-center gap-2.5 ${
-                          isActive ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' :
-                          isAnswered ? 'text-emerald-700 hover:bg-emerald-50' :
-                          'text-slate-500 hover:bg-slate-50'
+                        className={`w-full text-left px-4 py-3 rounded-xl text-sm transition-all flex items-center gap-3 border ${
+                          isActive ? 'bg-white dark:bg-slate-800 shadow-lg shadow-indigo-100/60 dark:shadow-black/30 text-indigo-700 dark:text-indigo-400 border-indigo-100 dark:border-indigo-700/50 scale-[1.03] z-10 my-0.5' :
+                          isAnswered ? 'text-emerald-700 dark:text-emerald-400 hover:bg-white/60 dark:hover:bg-slate-800/50 hover:shadow-sm border-transparent' :
+                          'text-slate-600 dark:text-slate-400 hover:bg-white/40 dark:hover:bg-slate-800/30 hover:shadow-sm border-transparent'
                         }`}>
-                        <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-                          isAnswered ? 'bg-emerald-500 text-white' :
-                          isActive ? 'bg-indigo-600 text-white' :
-                          'bg-slate-200 text-slate-500'
+                        <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0 shadow-sm ${
+                          isAnswered ? 'bg-gradient-to-br from-emerald-400 to-emerald-600 text-white' :
+                          isActive ? 'bg-gradient-to-br from-indigo-500 to-indigo-700 text-white shadow-indigo-200/50' :
+                          'bg-slate-200/70 dark:bg-slate-600/50 text-slate-500 dark:text-slate-400'
                         }`}>
                           {isAnswered ? '✓' : i + 1}
                         </span>
@@ -383,13 +426,13 @@ export default function StudentPage() {
                   })}
                 </div>
                 {/* Submit All */}
-                <div className="p-3 border-t border-slate-100">
+                <div className="p-3 border-t border-slate-100 dark:border-slate-700/50">
                   <button onClick={() => handleSubmitAll(false)}
-                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-2.5 rounded-xl transition-colors shadow-sm shadow-indigo-200">
+                    className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 active:scale-95 text-white text-xs font-semibold py-2.5 rounded-xl transition-all shadow-lg shadow-indigo-500/25 hover:scale-[1.02]">
                     Submit All Answers
                   </button>
                   {tabSwitchCount > 0 && (
-                    <p className="text-xs text-red-500 text-center mt-2">
+                    <p className="text-xs text-red-500 dark:text-red-400 text-center mt-2">
                       ⚠️ {tabSwitchCount} tab switch{tabSwitchCount > 1 ? 'es' : ''} recorded
                     </p>
                   )}
@@ -408,29 +451,29 @@ export default function StudentPage() {
                   const marksAwarded = submitted?.marks_awarded;
 
                   return (
-                    <div className="p-8 max-w-3xl">
+                    <div className="p-8 max-w-3xl animate-fade-in">
                       {/* Question Header */}
                       <div className="flex items-start justify-between gap-4 mb-6">
                         <div>
                           <div className="flex items-center gap-2 mb-2 flex-wrap">
-                            <span className="text-indigo-600 text-xs font-bold uppercase tracking-wider">
+                            <span className="text-indigo-600 dark:text-indigo-400 text-xs font-bold uppercase tracking-wider">
                               Question {activeQ + 1} of {questions.length}
                             </span>
-                            <span className="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full font-medium">
+                            <span className="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs px-2.5 py-0.5 rounded-full font-medium">
                               {q.max_marks as number} marks
                             </span>
                             {isReviewed && (
-                              <span className="bg-emerald-50 text-emerald-600 border border-emerald-200 text-xs px-2 py-0.5 rounded-full font-semibold">
+                              <span className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-700/50 text-xs px-2 py-0.5 rounded-full font-semibold">
                                 {marksAwarded as number}/{q.max_marks as number} awarded ✓
                               </span>
                             )}
                             {isSubmitted && !isReviewed && (
-                              <span className="bg-amber-50 text-amber-600 border border-amber-200 text-xs px-2 py-0.5 rounded-full font-semibold">
+                              <span className="bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-700/50 text-xs px-2 py-0.5 rounded-full font-semibold">
                                 Submitted · Pending review
                               </span>
                             )}
                           </div>
-                          <h2 className="text-slate-800 text-lg font-semibold leading-relaxed">{q.question_text as string}</h2>
+                          <h2 className="text-slate-800 dark:text-white text-lg font-semibold leading-relaxed">{q.question_text as string}</h2>
                         </div>
                       </div>
 
@@ -439,7 +482,7 @@ export default function StudentPage() {
                         // ── Code Question ────────────────────────────────────
                         <div className="space-y-4">
                           <div className="flex items-center justify-between">
-                            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
+                            <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
                               Your Code
                             </label>
                             {isSubmitted && (
@@ -470,7 +513,7 @@ export default function StudentPage() {
                           {/* Submit button + status */}
                           {!isSubmitted && (
                             <div className="flex items-center justify-between pt-1">
-                              <div className="text-xs text-slate-400">
+                              <div className="text-xs text-slate-400 dark:text-slate-500">
                                 {evaluating === qid && (
                                   <span className="flex items-center gap-1.5 text-indigo-400">
                                     <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
@@ -485,7 +528,7 @@ export default function StudentPage() {
                                 id={`submit-code-${qid}`}
                                 onClick={() => evaluateCode(qid)}
                                 disabled={evaluating === qid || !codeDrafts[qid]?.code?.trim()}
-                                className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition-all shadow-lg shadow-indigo-900/40 disabled:opacity-40 disabled:cursor-not-allowed"
+                                className="inline-flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 active:scale-95 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition-all shadow-lg shadow-indigo-500/25 disabled:opacity-40 disabled:cursor-not-allowed hover:scale-[1.02]"
                               >
                                 {evaluating === qid ? (
                                   <><svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Running...</>
@@ -515,7 +558,7 @@ export default function StudentPage() {
                       ) : (
                         // ── Text Question (original UI) ───────────────────────
                         <div className="space-y-3">
-                          <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
+                          <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
                             Your Answer
                           </label>
                           <textarea
@@ -524,25 +567,25 @@ export default function StudentPage() {
                             disabled={isSubmitted}
                             rows={8}
                             placeholder="Type your answer here..."
-                            className={`w-full border rounded-2xl px-5 py-4 text-slate-800 text-sm leading-relaxed focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all resize-none ${
+                            className={`w-full border rounded-2xl px-6 py-5 text-slate-800 dark:text-white text-base leading-relaxed focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 transition-all resize-none ${
                               isSubmitted
-                                ? 'bg-slate-50 border-slate-200 text-slate-500 cursor-not-allowed'
-                                : 'bg-white border-slate-200 hover:border-slate-300'
+                                ? 'bg-slate-50/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed'
+                                : 'bg-white/60 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-md focus:bg-white dark:focus:bg-slate-800 placeholder-slate-300 dark:placeholder-slate-600'
                             }`}
                           />
                           <div className="flex items-center justify-between">
                             <div>
                               {savedAt[qid] && (
-                                <p className="text-xs text-emerald-600">✓ Saved at {savedAt[qid]}</p>
+                                <p className="text-xs text-emerald-600 dark:text-emerald-400">✓ Saved at {savedAt[qid]}</p>
                               )}
                               {!isSubmitted && draft?.trim() && !savedAt[qid] && (
-                                <p className="text-xs text-slate-400">Unsaved changes</p>
+                                <p className="text-xs text-slate-400 dark:text-slate-500">Unsaved changes</p>
                               )}
                             </div>
                             {!isSubmitted && (
                               <button onClick={() => saveAnswer(qid)}
                                 disabled={saving === qid || !draft?.trim()}
-                                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition-colors shadow-sm shadow-indigo-200 disabled:opacity-40">
+                                className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 active:scale-95 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition-all shadow-lg shadow-indigo-500/25 hover:scale-[1.02] disabled:opacity-40 disabled:hover:scale-100">
                                 {saving === qid ? 'Saving...' : 'Save Answer'}
                               </button>
                             )}
@@ -551,22 +594,22 @@ export default function StudentPage() {
                       )}
 
                       {/* Navigation */}
-                      <div className="flex gap-3 mt-8 pt-6 border-t border-slate-100">
+                      <div className="flex gap-3 mt-8 pt-6 border-t border-slate-100 dark:border-slate-700/50">
                         {activeQ > 0 && (
                           <button onClick={() => setActiveQ(i => i - 1)}
-                            className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 text-slate-500 hover:text-slate-700 hover:border-slate-300 rounded-xl text-sm font-medium transition-all">
+                            className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-500 rounded-xl text-sm font-medium transition-all hover:shadow-sm">
                             ← Previous
                           </button>
                         )}
                         {activeQ < questions.length - 1 && (
                           <button onClick={() => setActiveQ(i => i + 1)}
-                            className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 text-slate-500 hover:text-slate-700 hover:border-slate-300 rounded-xl text-sm font-medium transition-all">
+                            className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-500 rounded-xl text-sm font-medium transition-all hover:shadow-sm">
                             Next →
                           </button>
                         )}
                         {activeQ === questions.length - 1 && (
                           <button onClick={() => handleSubmitAll(false)}
-                            className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold transition-all">
+                            className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white rounded-xl text-sm font-semibold transition-all shadow-lg shadow-emerald-500/20 hover:scale-[1.02]">
                             Submit All ✓
                           </button>
                         )}
@@ -582,19 +625,20 @@ export default function StudentPage() {
 
       {/* Leaderboard Tab */}
       {tab === 'leaderboard' && (
-        <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
+        <div className="flex-1 overflow-y-auto p-6">
           <div className="max-w-2xl mx-auto">
             {myRank > 0 && (
-              <div className="bg-white border border-indigo-200 rounded-2xl p-4 mb-6 flex items-center gap-4 shadow-sm">
-                <div className="text-3xl font-black text-indigo-600">#{myRank}</div>
-                <div>
-                  <p className="font-semibold text-slate-800">Your Rank</p>
-                  <p className="text-slate-400 text-sm">{myScore} points earned so far</p>
+              <div className="bg-white/70 dark:bg-slate-800/60 backdrop-blur-xl border border-indigo-200/50 dark:border-indigo-700/40 rounded-2xl p-5 mb-6 flex items-center gap-4 shadow-lg shadow-indigo-100/40 dark:shadow-black/20 hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/5 to-purple-500/5 dark:from-indigo-500/10 dark:to-purple-500/10 pointer-events-none" />
+                <div className="text-3xl font-black text-indigo-600 dark:text-indigo-400 relative">#{myRank}</div>
+                <div className="relative">
+                  <p className="font-bold text-lg text-slate-800 dark:text-white">{firstName ? `${firstName}'s Rank` : 'Your Rank'}</p>
+                  <p className="text-slate-400 dark:text-slate-500 text-sm">{myScore} points earned so far</p>
                 </div>
               </div>
             )}
             {!assessment && (
-              <div className="text-center py-10 text-slate-400 text-sm">No active assessment.</div>
+              <div className="text-center py-10 text-slate-400 dark:text-slate-500 text-sm">No active assessment.</div>
             )}
             <div className="space-y-2">
               {leaderboard.map((s: any, i: number) => {
@@ -602,25 +646,32 @@ export default function StudentPage() {
                 const medals = ['🥇', '🥈', '🥉'];
                 return (
                   <div key={s.usn as string}
-                    className={`bg-white border rounded-2xl p-4 flex items-center gap-4 shadow-sm transition-all ${
-                      isMe ? 'border-indigo-300 bg-indigo-50/40' :
-                      i === 0 ? 'border-amber-200 bg-amber-50/30' :
-                      'border-slate-200'
+                    className={`border rounded-2xl p-4 flex items-center gap-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg backdrop-blur-lg relative overflow-hidden ${
+                      isMe ? 'border-indigo-300/50 dark:border-indigo-600/40 bg-indigo-50/60 dark:bg-indigo-900/20 shadow-indigo-100/40 dark:shadow-indigo-900/30' :
+                      i === 0 ? 'border-amber-200/50 dark:border-amber-700/40 bg-gradient-to-r from-amber-50/70 to-white/50 dark:from-amber-900/20 dark:to-slate-800/50 shadow-amber-100/50' :
+                      i === 1 ? 'border-slate-300/50 dark:border-slate-600/40 bg-gradient-to-r from-slate-100/70 to-white/50 dark:from-slate-800/50 dark:to-slate-800/30 shadow-sm' :
+                      i === 2 ? 'border-orange-200/50 dark:border-orange-700/40 bg-gradient-to-r from-orange-50/70 to-white/50 dark:from-orange-900/20 dark:to-slate-800/50 shadow-sm' :
+                      'border-white/40 dark:border-slate-700/40 bg-white/60 dark:bg-slate-800/40 shadow-sm'
                     }`}>
-                    <div className="w-10 text-center">
+                    {i < 3 && <div className={`absolute inset-0 pointer-events-none ${
+                      i === 0 ? 'bg-gradient-to-r from-amber-400/5 to-transparent' :
+                      i === 1 ? 'bg-gradient-to-r from-slate-400/5 to-transparent' :
+                      'bg-gradient-to-r from-orange-400/5 to-transparent'
+                    }`} />}
+                    <div className="w-10 text-center relative">
                       {i < 3
-                        ? <span className="text-xl">{medals[i]}</span>
-                        : <span className="text-slate-400 font-bold text-sm">#{i + 1}</span>}
+                        ? <span className="text-2xl drop-shadow-sm">{medals[i]}</span>
+                        : <span className="text-slate-400 dark:text-slate-500 font-bold text-sm">#{i + 1}</span>}
                     </div>
-                    <div className="flex-1">
-                      <p className={`font-semibold text-sm ${isMe ? 'text-indigo-700' : 'text-slate-800'}`}>
-                        {s.name as string}{isMe && <span className="text-indigo-400 font-normal text-xs ml-1">(You)</span>}
+                    <div className="flex-1 relative">
+                      <p className={`font-semibold text-sm ${isMe ? 'text-indigo-700 dark:text-indigo-400' : 'text-slate-800 dark:text-slate-200'}`}>
+                        {s.name as string}{isMe && <span className="text-indigo-400 dark:text-indigo-500 font-normal text-xs ml-1">(You)</span>}
                       </p>
-                      <p className="text-slate-400 text-xs font-mono">{s.usn as string} · {s.answered as number}/{s.total_questions as number} answered</p>
+                      <p className="text-slate-400 dark:text-slate-500 text-xs font-mono">{s.usn as string} · {s.answered as number}/{s.total_questions as number} answered</p>
                     </div>
-                    <div className="text-right">
-                      <p className="text-xl font-black text-indigo-600">{(s.score as number) || 0}</p>
-                      <p className="text-slate-400 text-xs">/ {s.total_marks as number} marks</p>
+                    <div className="text-right relative">
+                      <p className={`text-xl font-black tabular-nums ${isMe ? 'text-indigo-600 dark:text-indigo-400' : i === 0 ? 'text-amber-600 dark:text-amber-400' : 'text-indigo-600 dark:text-indigo-400'}`}>{(s.score as number) || 0}</p>
+                      <p className="text-slate-400 dark:text-slate-500 text-xs">/ {s.total_marks as number} marks</p>
                     </div>
                   </div>
                 );
