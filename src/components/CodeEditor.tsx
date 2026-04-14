@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import type { OnMount } from '@monaco-editor/react';
+import { motion } from 'framer-motion';
 
 // Dynamic import to prevent SSR issues with Monaco
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
@@ -20,16 +21,9 @@ export const LANGUAGES: Language[] = [
     id: 71,
     label: 'Python 3',
     monacoLang: 'python',
-    // sys.stdin.read().split() reads ALL stdin at once into a list of tokens.
-    // This avoids EOFError that input() raises in Judge0's non-TTY sandbox.
     boilerplate: `import sys
 data = sys.stdin.read().split()
-idx = 0  # advance this pointer as you consume tokens
-
-# Example: read a list of n integers on line 1, then a target on line 2
-# n = int(data[idx]); idx += 1          # or just use positional indices
-# nums = [int(data[idx+i]) for i in range(n)]; idx += n
-# target = int(data[idx]); idx += 1
+idx = 0
 
 # Your solution here
 
@@ -37,21 +31,15 @@ idx = 0  # advance this pointer as you consume tokens
   },
   {
     id: 63,
-    label: 'JavaScript (Node.js)',
+    label: 'JavaScript',
     monacoLang: 'javascript',
-    // process.stdin is non-interactive in Judge0; collect all chunks then solve.
     boilerplate: `process.stdin.resume();
 process.stdin.setEncoding('utf8');
 let input = '';
 process.stdin.on('data', d => input += d);
 process.stdin.on('end', () => {
   const tokens = input.trim().split(/\\s+/);
-  let idx = 0;
-  const next = () => tokens[idx++];
-  const nextInt = () => parseInt(next(), 10);
-
-  // Your solution here — use next() / nextInt() to read tokens
-
+  // Your solution here
 });
 `,
   },
@@ -65,51 +53,13 @@ using namespace std;
 int main() {
     ios_base::sync_with_stdio(false);
     cin.tie(NULL);
-
-    // cin works reliably in Judge0 — read tokens normally
-    // e.g.: int n; cin >> n;
-
-    return 0;
-}
-`,
-  },
-  {
-    id: 62,
-    label: 'Java',
-    monacoLang: 'java',
-    boilerplate: `import java.util.*;
-import java.io.*;
-
-public class Main {
-    public static void main(String[] args) throws IOException {
-        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
-        StreamTokenizer st = new StreamTokenizer(br);
-        // st.nextToken(); int n = (int) st.nval;  // read next token as int
-
-        // Your solution here
-
-    }
-}
-`,
-  },
-  {
-    id: 50,
-    label: 'C',
-    monacoLang: 'c',
-    boilerplate: `#include <stdio.h>
-#include <stdlib.h>
-
-int main() {
-    // scanf works reliably in Judge0
-    // e.g.: int n; scanf("%d", &n);
-
+    // Your solution here
     return 0;
 }
 `,
   },
 ];
 
-// ── Props ──────────────────────────────────────────────────────────────────
 interface CodeEditorProps {
   value: string;
   languageId: number;
@@ -118,7 +68,6 @@ interface CodeEditorProps {
   disabled?: boolean;
 }
 
-// ── Component ──────────────────────────────────────────────────────────────
 export default function CodeEditor({
   value,
   languageId,
@@ -131,81 +80,65 @@ export default function CodeEditor({
 
   const handleEditorMount: OnMount = useCallback((_editor, monaco) => {
     setEditorMounted(true);
-    monaco.editor.defineTheme('mentimeter-dark', {
+    monaco.editor.defineTheme('mentimeter-premium', {
       base: 'vs-dark',
       inherit: true,
       rules: [
-        { token: 'comment', foreground: '6A9955', fontStyle: 'italic' },
-        { token: 'keyword', foreground: '569CD6', fontStyle: 'bold' },
-        { token: 'string', foreground: 'CE9178' },
-        { token: 'number', foreground: 'B5CEA8' },
+        { token: 'comment', foreground: '6272a4', fontStyle: 'italic' },
+        { token: 'keyword', foreground: 'ff79c6', fontStyle: 'bold' },
+        { token: 'string', foreground: 'f1fa8c' },
+        { token: 'number', foreground: 'bd93f9' },
       ],
       colors: {
-        'editor.background': '#0F172A',
-        'editor.foreground': '#E2E8F0',
-        'editorLineNumber.foreground': '#334155',
-        'editorLineNumber.activeForeground': '#64748B',
-        'editor.selectionBackground': '#1E3A5F',
-        'editor.lineHighlightBackground': '#1E293B',
-        'editorIndentGuide.background': '#1E293B',
-        'editorCursor.foreground': '#818CF8',
-        'editor.inactiveSelectionBackground': '#1E293B',
+        'editor.background': '#0f172a',
+        'editor.foreground': '#f8f8f2',
+        'editorLineNumber.foreground': '#44475a',
+        'editorLineNumber.activeForeground': '#6272a4',
+        'editor.selectionBackground': '#44475a80',
+        'editor.lineHighlightBackground': '#44475a20',
+        'editorIndentGuide.background': '#44475a40',
+        'editorCursor.foreground': '#aeafad',
       },
     });
-    monaco.editor.setTheme('mentimeter-dark');
+    monaco.editor.setTheme('mentimeter-premium');
   }, []);
 
-  const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const lang = LANGUAGES.find((l) => l.id === parseInt(e.target.value));
-    if (lang) {
-      onLanguageChange(lang);
-    }
-  };
-
   return (
-    <div className="flex flex-col rounded-2xl overflow-hidden border border-slate-700 shadow-xl bg-slate-900">
-      {/* Toolbar */}
-      <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-slate-800 border-b border-slate-700">
-        {/* Language indicator dots */}
-        <div className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-full bg-red-500/80 inline-block" />
-          <span className="w-3 h-3 rounded-full bg-yellow-500/80 inline-block" />
-          <span className="w-3 h-3 rounded-full bg-green-500/80 inline-block" />
-        </div>
-
-        {/* Language selector */}
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col rounded-3xl overflow-hidden bg-slate-900 border-2 border-indigo-500/10 shadow-2xl relative">
+      <div className="flex items-center justify-between gap-6 px-6 py-4 bg-slate-800/40 border-b-2 border-indigo-500/10">
         <div className="flex items-center gap-2">
-          <span className="text-slate-400 text-xs font-medium">Language:</span>
-          <select
-            id="language-selector"
-            value={selectedLang.id}
-            onChange={handleLanguageChange}
-            disabled={disabled}
-            className="bg-slate-700 border border-slate-600 text-slate-200 text-xs font-mono rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-colors hover:border-slate-500"
-          >
-            {LANGUAGES.map((lang) => (
-              <option key={lang.id} value={lang.id}>
-                {lang.label}
-              </option>
-            ))}
-          </select>
+          <div className="flex gap-1.5 mr-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-red-400" />
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+          </div>
+          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-600 dark:text-slate-400">Source Editor</span>
         </div>
 
-        {/* Status indicator */}
-        <div className="flex items-center gap-1.5 text-xs text-slate-500">
-          {!editorMounted && (
-            <span className="animate-pulse text-slate-500">Loading editor...</span>
-          )}
-          {editorMounted && (
-            <span className="text-emerald-500/70">● Ready</span>
-          )}
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2.5">
+            <span className="text-slate-600 dark:text-slate-400 text-[10px] font-black uppercase tracking-widest">Lang:</span>
+            <select
+              value={selectedLang.id}
+              onChange={(e) => {
+                const lang = LANGUAGES.find((l) => l.id === parseInt(e.target.value));
+                if (lang) onLanguageChange(lang);
+              }}
+              disabled={disabled}
+              className="bg-black/40 border border-white/5 text-slate-200 text-[10px] font-black uppercase tracking-widest rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer disabled:opacity-50 transition-all shadow-sm"
+            >
+              {LANGUAGES.map((lang) => (
+                <option key={lang.id} value={lang.id} className="bg-slate-900 text-white">{lang.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className={`w-2 h-2 rounded-full shadow-[0_0_8px] shadow-current ${editorMounted ? 'bg-emerald-500 text-emerald-500' : 'bg-amber-500 text-amber-500 animate-pulse'}`} />
         </div>
       </div>
 
-      {/* Monaco Editor */}
-      <div className={`transition-opacity duration-300 ${disabled ? 'opacity-60 pointer-events-none' : 'opacity-100'}`}>
+      <div className={`transition-all duration-700 ${disabled ? 'grayscale-[0.5] opacity-50 pointer-events-none' : 'opacity-100'}`}>
         <MonacoEditor
-          height="400px"
+          height="450px"
           language={selectedLang.monacoLang}
           value={value}
           onChange={(val) => onChange(val ?? '')}
@@ -213,29 +146,25 @@ export default function CodeEditor({
           options={{
             minimap: { enabled: false },
             fontSize: 14,
-            fontFamily: '"Fira Code", "Cascadia Code", "JetBrains Mono", "Consolas", monospace',
-            fontLigatures: true,
-            lineHeight: 22,
-            padding: { top: 16, bottom: 16 },
+            fontFamily: '"Fira Code", "JetBrains Mono", monospace',
+            lineHeight: 24,
+            padding: { top: 20, bottom: 20 },
             scrollBeyondLastLine: false,
             wordWrap: 'on',
             tabSize: 4,
-            insertSpaces: true,
             automaticLayout: true,
-            renderWhitespace: 'selection',
             cursorBlinking: 'smooth',
             cursorSmoothCaretAnimation: 'on',
             smoothScrolling: true,
             readOnly: disabled,
-            contextmenu: false,
             scrollbar: {
-              verticalScrollbarSize: 6,
-              horizontalScrollbarSize: 6,
+              verticalScrollbarSize: 4,
+              horizontalScrollbarSize: 4,
             },
           }}
-          theme="mentimeter-dark"
         />
       </div>
-    </div>
+    </motion.div>
   );
 }
+

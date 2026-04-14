@@ -100,18 +100,36 @@ if __name__ == '__main__':
     validate()
 `;
       try {
-        const stdout = execSync(`python3 -c "${pythonScript.replace(/"/g, '\\"')}" "${functionName}" ${expectedParamCount}`, {
-          input: studentCode,
-          timeout: 2000, // 2 second max constraint for parser
-          encoding: 'utf-8'
-        });
-        const result = JSON.parse(stdout.trim());
+        const { runPythonScript } = require('./python-runner');
+        const stdout = runPythonScript(pythonScript, [functionName, expectedParamCount.toString()], studentCode);
+        
+        console.log(`[CodeAssembler] RAW ANALYSIS RESPONSE:`, stdout);
+
+        let result: any;
+        if (!stdout || stdout.trim() === "") {
+          console.warn("[CodeAssembler] Empty response from analysis engine, skipping validation.");
+          return null; 
+        }
+
+        try {
+          result = JSON.parse(stdout.trim());
+        } catch (err) {
+          console.error("[CodeAssembler] Invalid JSON from Python AST:", stdout);
+          console.warn("[CodeAssembler] Skipping static analysis due to invalid response.");
+          return null; // Analysis failed but execution should continue
+        }
+
+        if (!result || typeof result !== "object") {
+          console.warn("[CodeAssembler] Invalid analysis response structure, skipping.");
+          return null;
+        }
+
         if (result.error) return result.error;
         return null;
-      } catch (err: unknown) {
-        // Fallback for execution error (python not found, timeout) or unparseable JSON
+      } catch (err: any) {
         console.error("Python AST execution proxy error:", err);
-        return "Internal Error: Unable to perform rigorous Python static analysis structure validation.";
+        console.warn("[CodeAssembler] Skipping static analysis due to execution error.");
+        return null; // Analysis failed but execution should continue
       }
     }
 

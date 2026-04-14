@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -13,116 +14,194 @@ export default function LoginPage() {
   const [dark, setDark] = useState(false);
 
   useEffect(() => {
+    // Sync initial state
     setDark(document.documentElement.classList.contains('dark'));
+    
+    // Listen for storage changes from other tabs
+    const syncTheme = () => setDark(document.documentElement.classList.contains('dark'));
+    window.addEventListener('storage', syncTheme);
+    return () => window.removeEventListener('storage', syncTheme);
   }, []);
 
   const toggleDark = () => {
-    document.documentElement.classList.add('transitioning');
-    document.documentElement.classList.toggle('dark');
-    const isDark = document.documentElement.classList.contains('dark');
-    setDark(isDark);
-    localStorage.setItem('theme', isDark ? 'dark' : 'light');
-    setTimeout(() => document.documentElement.classList.remove('transitioning'), 350);
+    const html = document.documentElement;
+    html.classList.add('transitioning');
+    
+    if (html.classList.contains('dark')) {
+      html.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+      setDark(false);
+    } else {
+      html.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+      setDark(true);
+    }
+    
+    setTimeout(() => html.classList.remove('transitioning'), 500);
   };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true); setError('');
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password, role }),
-    });
-    const data = await res.json();
-    setLoading(false);
-    if (!res.ok) { setError(data.error || 'Login failed'); return; }
-    router.push(role === 'admin' ? '/admin' : '/student');
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password, role }),
+      });
+      const data = await res.json();
+      setLoading(false);
+      if (!res.ok) { setError(data.error || 'Login failed'); return; }
+      router.push(role === 'admin' ? '/admin' : '/student');
+    } catch {
+      setError('Connection refused. Please try again.');
+      setLoading(false);
+    }
   };
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950 flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Background decorative blobs */}
-      <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-indigo-400/20 to-purple-400/10 dark:from-indigo-600/10 dark:to-purple-600/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />
-      <div className="absolute bottom-0 left-0 w-80 h-80 bg-gradient-to-tr from-teal-400/15 to-indigo-400/10 dark:from-teal-600/5 dark:to-indigo-600/5 rounded-full blur-3xl translate-y-1/3 -translate-x-1/4" />
+    <div className="min-h-screen bg-background mesh-gradient flex flex-col items-center justify-center p-6 relative overflow-hidden">
+      {/* Decorative Blobs moved to mesh-gradient via globals.css, but we'll add some extra depth */}
+      <div className="absolute top-[10%] right-[15%] w-[40rem] h-[40rem] bg-indigo-500/10 blur-[120px] rounded-full animate-pulse-soft pointer-events-none" />
+      <div className="absolute bottom-[5%] left-[10%] w-[30rem] h-[30rem] bg-purple-500/10 blur-[100px] rounded-full animate-pulse-soft pointer-events-none" style={{ animationDelay: '1s' }} />
 
-      {/* Dark mode toggle */}
-      <button onClick={toggleDark}
-        className="absolute top-5 right-5 z-20 w-10 h-10 rounded-xl bg-white/70 dark:bg-slate-800/70 backdrop-blur-md border border-white/40 dark:border-slate-700/50 shadow-lg flex items-center justify-center text-lg hover:scale-110 active:scale-95 transition-all"
+      <motion.button 
+        whileHover={{ scale: 1.1, rotate: 5 }} 
+        whileTap={{ scale: 0.9 }} 
+        onClick={toggleDark}
+        className="absolute top-10 right-10 z-50 w-12 h-12 rounded-2xl glass flex items-center justify-center text-xl shadow-2xl transition-all text-slate-700 dark:text-slate-300"
         aria-label="Toggle dark mode">
         {dark ? '☀️' : '🌙'}
-      </button>
+      </motion.button>
 
-      <div className="w-full max-w-md relative z-10 animate-slide-up">
+      <div className="w-full max-w-[440px] relative z-10">
         {/* Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2.5 mb-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/25">
-              <span className="text-white font-black text-lg">M</span>
-            </div>
-            <span className="text-2xl font-bold text-slate-800 dark:text-white tracking-tight">Mentimeter</span>
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }} 
+          animate={{ opacity: 1, y: 0 }} 
+          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }} 
+          className="text-center mb-10"
+        >
+          <div className="inline-flex items-center gap-4 mb-4">
+            <motion.div 
+              whileHover={{ rotate: 10 }}
+              className="w-12 h-12 premium-gradient rounded-2xl flex items-center justify-center shadow-xl shadow-indigo-500/20"
+            >
+              <span className="text-white font-black text-xl">M</span>
+            </motion.div>
+            <span className="text-3xl font-black text-foreground tracking-tight">Mentimeter</span>
           </div>
-          <p className="text-slate-500 dark:text-slate-400 text-sm">{greeting}! Welcome to your assessment portal.</p>
-          <p className="text-slate-400 dark:text-slate-500 text-xs mt-1">SJB Institute of Technology · AI &amp; ML Sec A</p>
-        </div>
+          <p className="text-muted-foreground font-bold tracking-tight opacity-70">{greeting}! Welcome to your secure assessment portal.</p>
+        </motion.div>
 
-        {/* Card */}
-        <div className="bg-white/70 dark:bg-slate-800/60 backdrop-blur-xl rounded-2xl shadow-xl shadow-indigo-100/40 dark:shadow-black/20 border border-white/40 dark:border-slate-700/50 p-8 transition-all duration-300 hover:shadow-2xl hover:-translate-y-0.5">
-          <h2 className="text-lg font-semibold text-slate-800 dark:text-white mb-1">Sign in to your account</h2>
-          <p className="text-slate-400 dark:text-slate-500 text-sm mb-6">Choose your role and enter your credentials</p>
+        {/* Login Card */}
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95, y: 30 }} 
+          animate={{ opacity: 1, scale: 1, y: 0 }} 
+          transition={{ duration: 0.6, delay: 0.1, ease: [0.16, 1, 0.3, 1] }} 
+          className="glass-premium p-10 rounded-[2.5rem] shadow-2xl relative overflow-hidden"
+        >
+          {/* Subtle internal gradient glow */}
+          <div className="absolute -top-24 -right-24 w-48 h-48 bg-indigo-500/10 blur-[60px] rounded-full pointer-events-none" />
+          
+          <div className="mb-8 relative z-10">
+            <h2 className="text-2xl font-black tracking-tight text-foreground mb-1.5 leading-none">Welcome back 👋</h2>
+            <p className="text-muted-foreground text-sm font-medium opacity-80">Ready to solve some problems today?</p>
+          </div>
 
           {/* Role Toggle */}
-          <div className="flex bg-slate-100/60 dark:bg-slate-700/40 backdrop-blur-sm rounded-xl p-1 mb-6 gap-1 border border-white/40 dark:border-slate-600/30">
+          <div className="flex bg-gray-100 dark:bg-black/40 backdrop-blur-md rounded-2xl p-1.5 mb-8 gap-1.5 border border-gray-200/50 dark:border-white/5 shadow-inner relative z-10">
             {(['student', 'admin'] as const).map(r => (
               <button key={r} onClick={() => setRole(r)}
-                className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${
                   role === r
-                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm'
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+                    ? 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-white/10 text-indigo-600 dark:text-indigo-400 shadow-xl'
+                    : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
                 }`}>
                 {r === 'admin' ? '⚙ Admin' : '🎓 Student'}
               </button>
             ))}
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Username</label>
+          <form onSubmit={handleLogin} className="space-y-6 relative z-10">
+            <div className="space-y-2">
+              <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] ml-1 opacity-70">Username</label>
               <input
                 type="text" value={username} onChange={e => setUsername(e.target.value)} required
-                placeholder={role === 'admin' ? 'admin' : 'e.g. gagan.g'}
-                className="w-full bg-white/50 dark:bg-slate-700/50 border border-slate-200/60 dark:border-slate-600/40 rounded-xl px-4 py-3 text-slate-800 dark:text-white text-sm placeholder-slate-300 dark:placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 transition-all hover:bg-white/80 dark:hover:bg-slate-700/70 shadow-inner focus:bg-white dark:focus:bg-slate-700 focus:shadow-md"
+                placeholder={role === 'admin' ? 'admin' : 'firstname.lastname'}
+                className="w-full"
               />
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Password</label>
+            <div className="space-y-2">
+              <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] ml-1 opacity-70">Secure Password</label>
               <input
                 type="password" value={password} onChange={e => setPassword(e.target.value)} required
-                placeholder={role === 'admin' ? 'admin123' : 'Your USN (e.g. 1JB23AI015)'}
-                className="w-full bg-white/50 dark:bg-slate-700/50 border border-slate-200/60 dark:border-slate-600/40 rounded-xl px-4 py-3 text-slate-800 dark:text-white text-sm placeholder-slate-300 dark:placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 transition-all hover:bg-white/80 dark:hover:bg-slate-700/70 shadow-inner focus:bg-white dark:focus:bg-slate-700 focus:shadow-md"
+                placeholder={role === 'admin' ? '••••••••' : 'Your Student ID / USN'}
+                className="w-full"
               />
             </div>
 
-            {error && (
-              <div className="bg-red-50 dark:bg-red-900/30 border border-red-100 dark:border-red-800/50 text-red-600 dark:text-red-400 text-sm px-4 py-3 rounded-xl">{error}</div>
-            )}
+            <AnimatePresence mode="wait">
+              {error && (
+                <motion.div 
+                  initial={{ opacity: 0, y: -10 }} 
+                  animate={{ opacity: 1, y: 0 }} 
+                  exit={{ opacity: 0, y: 10 }}
+                  className="bg-red-500/10 border border-red-500/20 text-red-500 text-[11px] font-black uppercase tracking-widest px-4 py-4 rounded-2xl flex items-center gap-3"
+                >
+                  <span className="text-lg">⚠️</span> {error}
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-            <button type="submit" disabled={loading}
-              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 active:scale-[0.98] text-white font-bold tracking-wide py-3.5 rounded-xl text-sm transition-all shadow-lg shadow-indigo-500/25 disabled:opacity-50 mt-4 hover:scale-[1.01] focus:ring-4 focus:ring-indigo-500/30 focus:outline-none">
-              {loading ? 'Signing in...' : `Sign in as ${role === 'admin' ? 'Admin' : 'Student'}`}
-            </button>
+            <motion.button 
+              whileHover={{ scale: 1.02, y: -2 }} 
+              whileTap={{ scale: 0.98 }} 
+              type="submit" 
+              disabled={loading}
+              className="w-full premium-gradient text-white font-black tracking-widest uppercase text-[11px] py-5 rounded-2xl transition-all shadow-xl shadow-indigo-500/20 disabled:opacity-50 mt-4 disabled:scale-100 flex items-center justify-center gap-3"
+            >
+              {loading ? (
+                <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+              ) : `Access Portal as ${role}`}
+            </motion.button>
+            <p className="text-center text-[9px] text-muted-foreground/50 font-black uppercase tracking-[0.25em] pt-2">Protected by Adaptive Security Layer</p>
           </form>
 
-          <div className="mt-6 p-4 bg-slate-50/80 dark:bg-slate-700/30 rounded-xl border border-slate-100 dark:border-slate-600/30">
-            <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Login Format</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Students: <span className="text-slate-700 dark:text-slate-300 font-medium">firstname.lastname</span> / <span className="text-slate-700 dark:text-slate-300 font-medium">USN</span></p>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">e.g. <span className="font-mono text-indigo-600 dark:text-indigo-400">gagan.g</span> / <span className="font-mono text-indigo-600 dark:text-indigo-400">1JB23AI015</span></p>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Admin: <span className="font-mono text-indigo-600 dark:text-indigo-400">admin</span> / <span className="font-mono text-indigo-600 dark:text-indigo-400">admin123</span></p>
+          {/* Quick Help */}
+          <div className="mt-8 pt-6 border-t border-gray-200 dark:border-white/5 relative z-10">
+            <div className="flex items-center justify-between mb-5">
+              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-50">Session Nodes</span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-indigo-500/80">v4.2.0-STABLE</span>
+            </div>
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-1.5">
+                <span className="text-[9px] font-black uppercase tracking-widest text-indigo-500 opacity-80 block">Access Strategy</span>
+                <span className="text-[10px] font-bold text-muted-foreground leading-snug block opacity-70">Use internal LDAP or USN credentials.</span>
+              </div>
+              <div className="space-y-1.5">
+                <span className="text-[9px] font-black uppercase tracking-widest text-purple-500 opacity-80 block">Sentinel Guard</span>
+                <span className="text-[10px] font-bold text-muted-foreground leading-snug block opacity-70">Active monitoring for tab-switching active.</span>
+              </div>
+            </div>
           </div>
-        </div>
+        </motion.div>
+
+        {/* Footer info */}
+        <motion.div 
+          initial={{ opacity: 0 }} 
+          animate={{ opacity: 0.4 }} 
+          transition={{ delay: 0.8 }} 
+          className="text-center mt-8 space-y-1"
+        >
+          <p className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground">SJB Institute of Technology · Autonomous</p>
+          <p className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground">Faculty of AI & Machine Learning · Section A</p>
+        </motion.div>
       </div>
     </div>
   );
 }
+

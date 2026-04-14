@@ -33,7 +33,20 @@ export function useSubmissionPoller(
     const poll = async () => {
       try {
         const res = await fetch(`/api/student/submission-status?logId=${logId}`);
-        const data = await res.json();
+        const text = await res.text();
+        console.log(`[Poller] Poll logId=${logId} raw:`, text);
+        
+        if (!text || text.trim() === "") {
+           throw new Error("Empty response from status API");
+        }
+
+        let data: any;
+        try {
+          data = JSON.parse(text);
+        } catch (err) {
+          console.error(`[Poller] Invalid JSON for logId=${logId}:`, text);
+          throw new Error("Invalid response structure from status API");
+        }
 
         if (data.status === 'completed') {
           setPolls(prev => ({

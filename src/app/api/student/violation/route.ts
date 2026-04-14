@@ -11,7 +11,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
   }
 
-  const { assessmentId, type } = await req.json();
+  let body: any = {};
+  try {
+    body = await req.json();
+  } catch {
+    // Non-critical
+  }
+  const { assessmentId, type } = body;
 
   db.prepare(
     'INSERT INTO violations (student_id, assessment_id, type) VALUES (?, ?, ?)'

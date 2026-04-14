@@ -155,11 +155,23 @@ export async function processSubmission(jobData: EvaluationJobData) {
 
     let expectedParamCount = -1;
     try {
-      const parsedInput = JSON.parse(testCases[0].input);
-      if (Array.isArray(parsedInput)) {
-        expectedParamCount = parsedInput.length;
+      const inputStr = testCases[0].input?.trim();
+      if (inputStr) {
+        let parsedInput;
+        try {
+          parsedInput = JSON.parse(inputStr);
+        } catch (e) {
+          console.warn(`[evaluator] Test case input is not JSON, skipping param count detection:`, inputStr);
+          parsedInput = null;
+        }
+
+        if (Array.isArray(parsedInput)) {
+          expectedParamCount = parsedInput.length;
+        }
       }
-    } catch { /* soft fallback */ }
+    } catch (err) {
+      console.warn(`[evaluator] Unexpected error during param count detection:`, err);
+    }
 
     const assembly = await assembleCode({
       studentCode: sourceCode,

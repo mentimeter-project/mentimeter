@@ -10,7 +10,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
   }
 
-  const { event, count } = await req.json();
+  let body: any = {};
+  try {
+    body = await req.json();
+  } catch {
+    // Empty body is okay for this non-critical event endpoint
+  }
+  const { event, count } = body;
 
   try {
     db.prepare(

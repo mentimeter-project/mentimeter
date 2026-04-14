@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { motion, AnimatePresence } from 'framer-motion';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface TestCase {
@@ -77,7 +78,6 @@ export default function CreateAssessmentPage() {
     if (!title.trim()) { setError('Title is required'); return; }
     if (questions.some(q => !q.question_text.trim())) { setError('All questions must have text'); return; }
 
-    // Validate + sanitise function names for coding questions
     for (let i = 0; i < questions.length; i++) {
       const q = questions[i];
       if (q.question_type === 'code') {
@@ -85,27 +85,13 @@ export default function CreateAssessmentPage() {
           if (!q.function_name.trim()) {
             setError(`Question ${i + 1} is function-based but has no function name`); return;
           }
-
-          // Auto-sanitise: strip "def " / "function " prefix and call syntax
-          let fn = q.function_name.trim();
-          fn = fn.replace(/^(def|function)\s+/, '');
-          fn = fn.replace(/\s*\(.*$/, '').trim();
-
-          // Validate it's a proper identifier
+          let fn = q.function_name.trim().replace(/^(def|function)\s+/, '').replace(/\s*\(.*$/, '').trim();
           const VALID_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
           if (!VALID_IDENTIFIER.test(fn)) {
-            setError(
-              `Question ${i + 1}: "${fn}" is not a valid function name. ` +
-              `Use a plain name like "twoSum" or "group_anagrams" — no parentheses, spaces, or type hints.`
-            );
-            return;
+            setError(`Question ${i + 1}: "${fn}" is not a valid identifier.`); return;
           }
-
-          // Update the state with the sanitised name (remove extra syntax silently)
           if (fn !== q.function_name.trim()) {
-            setQuestions(prev => prev.map((qq, idx) =>
-              idx === i ? { ...qq, function_name: fn } : qq
-            ));
+            setQuestions(prev => prev.map((qq, idx) => idx === i ? { ...qq, function_name: fn } : qq));
           }
         }
         if (q.test_cases.length === 0) {
@@ -127,241 +113,253 @@ export default function CreateAssessmentPage() {
     router.push('/admin');
   };
 
-  const inputClass = 'w-full bg-white/50 dark:bg-slate-700/50 border border-slate-200/60 dark:border-slate-600/40 rounded-xl px-4 py-2.5 text-slate-800 dark:text-white text-sm placeholder-slate-300 dark:placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 transition-all';
-  const tcInputClass = 'flex-1 bg-slate-800 dark:bg-slate-900 border border-slate-700 dark:border-slate-600 rounded-lg px-3 py-2 text-slate-200 text-xs font-mono placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all';
+  const inputClass = 'w-full bg-white dark:bg-black/20 border border-gray-200 dark:border-white/5 rounded-xl px-4 py-2.5 text-foreground text-sm placeholder-muted-foreground/40 focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all shadow-inner';
+  const labelClass = 'text-xs font-black uppercase tracking-widest text-muted-foreground opacity-60 mb-2 block';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950 animate-fade-in">
+    <div className="min-h-screen bg-background animate-fade-in relative overflow-hidden">
+      {/* Decorative background blobs */}
+      <div className="absolute top-[-5%] right-[-5%] w-[40rem] h-[40rem] bg-indigo-500/5 dark:bg-indigo-500/10 blur-[130px] rounded-full animate-pulse-soft pointer-events-none" />
+      <div className="absolute bottom-[-10%] left-[-5%] w-[45rem] h-[45rem] bg-purple-500/5 dark:bg-purple-500/10 blur-[130px] rounded-full animate-pulse-soft pointer-events-none" style={{ animationDelay: '3s' }} />
+
       {/* Nav */}
-      <nav className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border-b border-white/30 dark:border-slate-700/40 px-6 py-4 flex justify-between items-center shadow-sm sticky top-0 z-10">
+      <nav className="glass border-b border-gray-200 dark:border-white/5 px-6 py-4 flex justify-between items-center sticky top-0 z-50 shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center shadow-md shadow-indigo-500/20">
+          <motion.div whileHover={{ rotate: 10 }} className="w-8 h-8 premium-gradient rounded-lg flex items-center justify-center shadow-md shadow-indigo-500/20">
             <span className="text-white font-black text-sm">M</span>
-          </div>
-          <span className="font-bold text-slate-800 dark:text-white">Create Assessment</span>
+          </motion.div>
+          <span className="font-black text-foreground text-base tracking-tight italic">Construct Assessment</span>
         </div>
-        <Link href="/admin" className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 text-sm font-medium transition-colors">← Back</Link>
+        <Link href="/admin">
+          <motion.button whileHover={{ x: -2 }} className="text-muted-foreground hover:text-foreground text-[10px] font-black uppercase tracking-widest transition-colors">← Back Registry</motion.button>
+        </Link>
       </nav>
 
-      <div className="max-w-3xl mx-auto p-6 space-y-4">
+      <div className="max-w-3xl mx-auto p-12 space-y-6">
+        <header className="mb-4">
+           <h2 className="text-4xl font-black text-foreground italic tracking-tight mb-2">Initialize New</h2>
+           <p className="text-muted-foreground font-medium uppercase tracking-[0.2em] text-[10px]">Define assessment protocols and validation cluster.</p>
+        </header>
+
         {/* Assessment Details */}
-        <div className="bg-white/70 dark:bg-slate-800/50 backdrop-blur-lg border border-white/30 dark:border-slate-700/40 rounded-2xl p-6 shadow-sm space-y-4">
-          <h2 className="font-semibold text-slate-700 dark:text-slate-200 text-sm uppercase tracking-wider">Assessment Details</h2>
-          <input
-            id="assessment-title"
-            placeholder="Assessment title" value={title} onChange={e => setTitle(e.target.value)}
-            className={inputClass}
-          />
-          <textarea
-            placeholder="Description (optional)" value={description} onChange={e => setDescription(e.target.value)} rows={2}
-            className={`${inputClass} resize-none`}
-          />
-          <div className="flex items-center gap-3">
-            <label className="text-sm text-slate-500 dark:text-slate-400 font-medium">Duration (minutes):</label>
+        <section className="glass-premium border border-gray-100 dark:border-white/5 rounded-3xl p-8 shadow-sm space-y-6">
+          <div>
+            <label className={labelClass}>Assessment Title</label>
             <input
-              type="number" value={duration} onChange={e => setDuration(parseInt(e.target.value))} min={5} max={180}
-              className="w-24 bg-white/50 dark:bg-slate-700/50 border border-slate-200/60 dark:border-slate-600/40 rounded-xl px-3 py-2 text-slate-800 dark:text-white text-sm focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 transition-all"
+              placeholder="e.g. Advanced System Architecture" value={title} onChange={e => setTitle(e.target.value)}
+              className={inputClass}
             />
           </div>
-        </div>
-
-        {/* Questions */}
-        {questions.map((q, i) => (
-          <div key={i} className="bg-white/70 dark:bg-slate-800/50 backdrop-blur-lg border border-white/30 dark:border-slate-700/40 rounded-2xl p-6 shadow-sm space-y-4">
-            {/* Question header */}
-            <div className="flex justify-between items-center">
-              <span className="text-indigo-600 dark:text-indigo-400 text-xs font-bold uppercase tracking-wider">Question {i + 1}</span>
-              {questions.length > 1 && (
-                <button onClick={() => setQuestions(p => p.filter((_, idx) => idx !== i))}
-                  className="text-red-400 dark:text-red-500 hover:text-red-600 dark:hover:text-red-400 text-xs font-medium transition-colors">
-                  Remove
-                </button>
-              )}
-            </div>
-
-            {/* Question text */}
+          <div>
+            <label className={labelClass}>Overview</label>
             <textarea
-              placeholder="Write your question here..." value={q.question_text}
-              onChange={e => updateQ(i, 'question_text', e.target.value)} rows={3}
+              placeholder="Technical description of assessment goals..." value={description} onChange={e => setDescription(e.target.value)} rows={2}
               className={`${inputClass} resize-none`}
             />
-
-            {/* Type selector + max marks */}
-            <div className="flex flex-wrap items-center gap-4">
-              {/* Question type toggle */}
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-slate-500 dark:text-slate-400 font-medium">Type:</span>
-                <div className="flex rounded-xl border border-slate-200 dark:border-slate-600 overflow-hidden">
-                  <button
-                    onClick={() => setQType(i, 'text')}
-                    className={`px-4 py-1.5 text-xs font-semibold transition-all ${
-                      q.question_type === 'text'
-                        ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white'
-                        : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
-                    }`}
-                  >
-                    📝 Text Answer
-                  </button>
-                  <button
-                    onClick={() => setQType(i, 'code')}
-                    className={`px-4 py-1.5 text-xs font-semibold transition-all border-l border-slate-200 dark:border-slate-600 ${
-                      q.question_type === 'code'
-                        ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white'
-                        : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
-                    }`}
-                  >
-                    💻 Coding
-                  </button>
-                </div>
-              </div>
-
-              {/* Max marks */}
-              <div className="flex items-center gap-2">
-                <label className="text-sm text-slate-500 dark:text-slate-400 font-medium">Max Marks:</label>
-                <input
-                  type="number" value={q.max_marks}
-                  onChange={e => updateQ(i, 'max_marks', parseInt(e.target.value))} min={1} max={100}
-                  className="w-20 bg-white/50 dark:bg-slate-700/50 border border-slate-200/60 dark:border-slate-600/40 rounded-xl px-3 py-1.5 text-slate-800 dark:text-white text-sm focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 transition-all"
-                />
-              </div>
+          </div>
+          <div className="flex items-center gap-6">
+            <div className="flex flex-col gap-1.5">
+               <label className={labelClass}>Duration (Min)</label>
+               <input
+                 type="number" value={duration} onChange={e => setDuration(parseInt(e.target.value) || 30)} min={5} max={300}
+                 className="w-24 bg-white dark:bg-slate-900 border border-gray-200 dark:border-white/5 rounded-xl px-4 py-2 text-foreground font-black text-xs focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none"
+               />
             </div>
+            <p className="text-[9px] font-black uppercase tracking-widest text-indigo-500/60 leading-tight">Ensure sufficient runtime for complex logic units.</p>
+          </div>
+        </section>
 
-            {/* Code Mode + Function Name (coding questions only) */}
-            {q.question_type === 'code' && (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-slate-500 dark:text-slate-400 font-medium">Code Mode:</span>
-                  <div className="flex rounded-xl border border-slate-200 dark:border-slate-600 overflow-hidden">
-                    <button
-                      onClick={() => setCodeMode(i, 'stdin')}
-                      className={`px-4 py-1.5 text-xs font-semibold transition-all ${
-                        q.code_mode === 'stdin'
-                          ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white'
-                          : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
-                      }`}
-                    >
-                      📦 Full Program (stdin)
-                    </button>
-                    <button
-                      onClick={() => setCodeMode(i, 'function')}
-                      className={`px-4 py-1.5 text-xs font-semibold transition-all border-l border-slate-200 dark:border-slate-600 ${
-                        q.code_mode === 'function'
-                          ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white'
-                          : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
-                      }`}
-                    >
-                      ⚡ Function-Based
-                    </button>
-                  </div>
+        {/* Questions */}
+        <div className="space-y-6">
+          <AnimatePresence>
+            {questions.map((q, i) => (
+              <motion.section 
+                key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}
+                className="glass-premium border border-gray-100 dark:border-white/5 rounded-3xl p-8 shadow-sm space-y-6 relative group"
+              >
+                {/* Question header */}
+                <div className="flex justify-between items-center">
+                  <span className="text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase tracking-[0.3em]">Module Cluster {String(i + 1).padStart(2, '0')}</span>
+                  {questions.length > 1 && (
+                    <motion.button whileTap={{ scale: 0.9 }} onClick={() => setQuestions(p => p.filter((_, idx) => idx !== i))}
+                      className="text-red-500 hover:text-red-400 text-xs font-black uppercase tracking-widest transition-colors flex items-center gap-1.5 group-hover:opacity-100 opacity-60">
+                      Wipe Module 🗑️
+                    </motion.button>
+                  )}
                 </div>
 
-                {q.code_mode === 'function' && (
-                  <div className="flex items-center gap-3">
-                    <label className="text-sm text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap">Function Name:</label>
+                {/* Question text */}
+                <div>
+                   <label className={labelClass}>Technical Requirements</label>
+                   <textarea
+                    placeholder="Enter logic task description..." value={q.question_text}
+                    onChange={e => updateQ(i, 'question_text', e.target.value)} rows={3}
+                    className={`${inputClass} resize-none py-4 leading-relaxed font-medium`}
+                  />
+                </div>
+
+                {/* Type selector + max marks */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className={labelClass}>Interface Mode</label>
+                    <div className="flex p-1 bg-gray-100 dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-white/5">
+                      <button
+                        onClick={() => setQType(i, 'text')}
+                        className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${
+                          q.question_type === 'text'
+                            ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400'
+                            : 'text-muted-foreground'
+                        }`}
+                      >
+                        📝 Discourse
+                      </button>
+                      <button
+                        onClick={() => setQType(i, 'code')}
+                        className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${
+                          q.question_type === 'code'
+                            ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400'
+                            : 'text-muted-foreground'
+                        }`}
+                      >
+                        💻 Syntax
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className={labelClass}>Weightage (PTS)</label>
                     <input
-                      type="text"
-                      value={q.function_name}
-                      onChange={e => updateQ(i, 'function_name', e.target.value)}
-                      placeholder="e.g. twoSum  (bare name only, no parentheses)"
-                      className={`${inputClass} max-w-xs font-mono`}
+                      type="number" value={q.max_marks}
+                      onChange={e => updateQ(i, 'max_marks', parseInt(e.target.value) || 10)} min={1} max={100}
+                      className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-white/5 rounded-xl px-4 py-2 text-foreground font-black text-xs focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none"
                     />
                   </div>
-                )}
-
-                {q.code_mode === 'function' && (
-                  <p className="text-xs text-indigo-500 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-700/30 rounded-lg px-3 py-2">
-                    💡 <strong>Function mode:</strong> Students only write the function body. Test case input should be a JSON array of arguments, e.g. <code className="bg-indigo-100 dark:bg-indigo-800/40 px-1 rounded">[[1,2,3], 9]</code> for <code className="bg-indigo-100 dark:bg-indigo-800/40 px-1 rounded">{q.function_name || 'fn'}(nums, target)</code>.
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Test Cases (coding questions only) */}
-            {q.question_type === 'code' && (
-              <div className="bg-slate-900 dark:bg-slate-950 rounded-xl p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-slate-300 text-xs font-semibold uppercase tracking-wider">
-                    🧪 Hidden Test Cases
-                    <span className="text-slate-500 font-normal ml-2">(students cannot see these)</span>
-                  </p>
-                  <span className="text-slate-500 text-xs">{q.test_cases.length} case{q.test_cases.length !== 1 ? 's' : ''}</span>
                 </div>
 
-                {q.test_cases.length === 0 && (
-                  <p className="text-slate-500 text-xs text-center py-3">
-                    Add at least one test case to evaluate student code.
-                  </p>
+                {/* Code Extras */}
+                {q.question_type === 'code' && (
+                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="space-y-6 pt-6 border-t border-gray-100 dark:border-white/5">
+                    <div className="space-y-4">
+                      <label className={labelClass}>Execution Environment</label>
+                      <div className="flex p-1 bg-gray-100 dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-white/5">
+                        <button
+                          onClick={() => setCodeMode(i, 'stdin')}
+                          className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${
+                            q.code_mode === 'stdin'
+                              ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400'
+                              : 'text-muted-foreground'
+                          }`}
+                        >
+                          📦 Standard I/O
+                        </button>
+                        <button
+                          onClick={() => setCodeMode(i, 'function')}
+                          className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${
+                            q.code_mode === 'function'
+                              ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400'
+                              : 'text-muted-foreground'
+                          }`}
+                        >
+                          ⚡ Logic Unit
+                        </button>
+                      </div>
+                    </div>
+
+                    {q.code_mode === 'function' && (
+                      <div className="space-y-2">
+                        <label className={labelClass}>Unit Identifier (Function Name)</label>
+                        <input
+                          type="text" value={q.function_name} onChange={e => updateQ(i, 'function_name', e.target.value)}
+                          placeholder="e.g. solve_logic_v1"
+                          className={`${inputClass} font-mono`}
+                        />
+                      </div>
+                    )}
+
+                    {/* Test Cases */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                         <label className={labelClass}>Validation Probes (Hidden)</label>
+                         <span className="text-[10px] font-medium text-muted-foreground opacity-50 px-2 py-0.5 rounded-lg border border-gray-200 dark:border-white/5">{q.test_cases.length} active</span>
+                      </div>
+
+                      <div className="space-y-3">
+                        {q.test_cases.map((tc, ti) => (
+                          <div key={ti} className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-white/5 rounded-2xl p-6 space-y-4 relative shadow-inner group/probe">
+                            <div className="flex items-center justify-between">
+                              <span className="text-indigo-500 text-[10px] font-black uppercase tracking-widest">Probe {ti + 1}</span>
+                              <div className="flex items-center gap-4">
+                                <div className="flex items-center gap-2">
+                                  <label className="text-[9px] font-black text-muted-foreground uppercase">Yield</label>
+                                  <input
+                                    type="number" value={tc.marks} min={1} max={50}
+                                    onChange={e => updateTestCase(i, ti, 'marks', parseInt(e.target.value) || 1)}
+                                    className="w-14 bg-white dark:bg-slate-800 border border-gray-200 dark:border-white/5 rounded-lg px-2 py-1 text-foreground text-xs font-black shadow-sm"
+                                  />
+                                </div>
+                                {q.test_cases.length > 1 && (
+                                  <button onClick={() => removeTestCase(i, ti)}
+                                    className="text-red-500/60 hover:text-red-500 p-1.5 hover:bg-red-500/10 rounded-lg transition-all">
+                                    ✕
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <label className="text-[9px] font-black uppercase tracking-widest opacity-40">Input Signal</label>
+                                <textarea
+                                  value={tc.input} onChange={e => updateTestCase(i, ti, 'input', e.target.value)} rows={2}
+                                  placeholder="(Blank if default)"
+                                  className="w-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-white/5 rounded-xl px-4 py-3 text-xs font-mono text-foreground focus:ring-1 focus:ring-indigo-500 outline-none resize-none shadow-sm"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <label className="text-[9px] font-black uppercase tracking-widest opacity-40">Target Artifact</label>
+                                <textarea
+                                  value={tc.expected_output} onChange={e => updateTestCase(i, ti, 'expected_output', e.target.value)} rows={2}
+                                  placeholder="Expected return signal..."
+                                  className="w-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-white/5 rounded-xl px-4 py-3 text-xs font-mono text-foreground focus:ring-1 focus:ring-indigo-500 outline-none resize-none shadow-sm"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <motion.button whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }} onClick={() => addTestCase(i)}
+                        className="w-full border-2 border-dashed border-gray-200 dark:border-white/10 hover:border-indigo-500/50 hover:bg-indigo-500/5 text-muted-foreground hover:text-indigo-500 rounded-2xl py-4 text-[10px] font-black uppercase tracking-widest transition-all">
+                        + Append Logic Probe
+                      </motion.button>
+                    </div>
+                  </motion.div>
                 )}
+              </motion.section>
+            ))}
+          </AnimatePresence>
+        </div>
 
-                {q.test_cases.map((tc, ti) => (
-                  <div key={ti} className="bg-slate-800 dark:bg-slate-900/80 rounded-lg p-3 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-indigo-400 text-xs font-semibold">Test Case {ti + 1}</span>
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-1.5">
-                          <label className="text-slate-400 text-xs">Marks:</label>
-                          <input
-                            type="number" value={tc.marks} min={1} max={50}
-                            onChange={e => updateTestCase(i, ti, 'marks', parseInt(e.target.value) || 1)}
-                            className="w-14 bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-slate-200 text-xs focus:outline-none focus:border-indigo-500"
-                          />
-                        </div>
-                        {q.test_cases.length > 1 && (
-                          <button onClick={() => removeTestCase(i, ti)}
-                            className="text-red-400 hover:text-red-300 text-xs font-medium transition-colors">
-                            ✕
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-slate-500 text-xs block mb-1">{q.code_mode === 'function' ? 'Input (JSON args)' : 'stdin (input)'}</label>
-                        <textarea
-                          value={tc.input}
-                          onChange={e => updateTestCase(i, ti, 'input', e.target.value)}
-                          rows={2}
-                          placeholder="(leave empty if no input)"
-                          className={`${tcInputClass} w-full resize-none`}
-                        />
-                      </div>
-                      <div>
-                        <label className="text-slate-500 text-xs block mb-1">{q.code_mode === 'function' ? 'Expected output *' : 'stdout (expected output) *'}</label>
-                        <textarea
-                          value={tc.expected_output}
-                          onChange={e => updateTestCase(i, ti, 'expected_output', e.target.value)}
-                          rows={2}
-                          placeholder="Expected output..."
-                          className={`${tcInputClass} w-full resize-none`}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
+        <div className="space-y-8 pt-8 border-t border-gray-100 dark:border-white/5">
+           <motion.button
+             whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}
+             onClick={() => setQuestions(p => [...p, emptyQ()])}
+             className="w-full p-8 rounded-[2rem] border-2 border-dashed border-gray-200 dark:border-white/10 hover:border-indigo-500/50 transition-all flex flex-col items-center justify-center gap-3 group"
+           >
+              <span className="text-2xl group-hover:scale-125 transition-transform duration-300">🏢</span>
+              <span className="text-[11px] font-black uppercase tracking-[0.4em] text-muted-foreground group-hover:text-indigo-500">Append Logic Cluster to Queue</span>
+           </motion.button>
 
-                <button
-                  onClick={() => addTestCase(i)}
-                  className="w-full border border-dashed border-slate-600 hover:border-indigo-500 text-slate-500 hover:text-indigo-400 rounded-lg py-2 text-xs font-medium transition-all"
-                >
-                  + Add Test Case
-                </button>
-              </div>
-            )}
-          </div>
-        ))}
+           {error && (
+             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-red-500/5 border border-red-500/20 text-red-500 text-[10px] font-black px-8 py-5 rounded-2xl uppercase tracking-widest shadow-2xl">
+                ⚠️ Protocol Error: {error}
+             </motion.div>
+           )}
 
-        <button
-          onClick={() => setQuestions(p => [...p, emptyQ()])}
-          className="w-full border-2 border-dashed border-slate-300 dark:border-slate-600 hover:border-indigo-400 dark:hover:border-indigo-500 text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-2xl py-4 text-sm font-semibold transition-all">
-          + Add Question
-        </button>
-
-        {error && <div className="bg-red-50 dark:bg-red-900/30 border border-red-100 dark:border-red-800/50 text-red-600 dark:text-red-400 text-sm px-4 py-3 rounded-xl">{error}</div>}
-
-        <button onClick={handleSubmit} disabled={submitting}
-          className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 active:scale-[0.98] text-white font-bold py-3.5 rounded-2xl transition-all shadow-lg shadow-indigo-500/25 disabled:opacity-50 hover:scale-[1.01]">
-          {submitting ? 'Creating...' : 'Create Assessment'}
-        </button>
+           <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={handleSubmit} disabled={submitting}
+             className="w-full premium-gradient text-white font-black py-6 rounded-[2rem] transition-all shadow-2xl shadow-indigo-500/30 disabled:opacity-50 uppercase tracking-[0.3em] text-[12px] flex items-center justify-center gap-4">
+             {submitting ? 'Finalizing...' : 'Finalize & Deploy Protocol 🛰️'}
+           </motion.button>
+        </div>
       </div>
     </div>
   );

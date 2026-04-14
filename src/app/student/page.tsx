@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
+import { motion, AnimatePresence } from 'framer-motion';
 import { LANGUAGES, type Language } from '@/components/CodeEditor';
 import EvalResultCard, { EvalResultSkeleton } from '@/components/EvalResultCard';
 import { useSubmissionPoller } from '@/hooks/useSubmissionPoller';
@@ -19,8 +20,8 @@ const getEncouragement = (answered: number, total: number, timeLeft: number | nu
   if (pct >= 0.75) return '🔥 Almost there! Just a few more to go.';
   if (pct >= 0.5) return '💪 Halfway done — great progress!';
   if (pct >= 0.25) return '📝 Good start! Keep the momentum going.';
-  if (timeLeft !== null && timeLeft < 300) return '⏰ Time is running low — focus on what you know!';
-  return '✨ Take your time, read carefully, and do your best.';
+  if (timeLeft !== null && timeLeft < 300) return '⏰ Time is running low!';
+  return '✨ Take your time and do your best.';
 };
 
 export default function StudentPage() {
@@ -84,12 +85,20 @@ export default function StudentPage() {
   }, []);
 
   const toggleDark = () => {
-    document.documentElement.classList.add('transitioning');
-    document.documentElement.classList.toggle('dark');
-    const isDark = document.documentElement.classList.contains('dark');
-    setDark(isDark);
-    localStorage.setItem('theme', isDark ? 'dark' : 'light');
-    setTimeout(() => document.documentElement.classList.remove('transitioning'), 350);
+    const html = document.documentElement;
+    html.classList.add('transitioning');
+    
+    if (html.classList.contains('dark')) {
+      html.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+      setDark(false);
+    } else {
+      html.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+      setDark(true);
+    }
+    
+    setTimeout(() => html.classList.remove('transitioning'), 500);
   };
 
   const fetchAssessment = useCallback(async () => {
@@ -199,7 +208,40 @@ export default function StudentPage() {
           sourceCode: draft.code,
         }),
       });
-      const data = await res.json();
+
+      const responseText = await res.text();
+      let data;
+
+      if (!responseText || responseText.trim() === "") {
+        console.error("Empty response from execution API");
+        setEvalResults(prev => ({ ...prev, [questionId]: { error: "Execution engine returned empty response" } }));
+        setEvaluating(null);
+        return;
+      }
+
+      try {
+        data = JSON.parse(responseText);
+      } catch (err) {
+        console.error("Invalid JSON response:", responseText);
+        setEvalResults(prev => ({ ...prev, [questionId]: { error: "Execution engine returned invalid response" } }));
+        setEvaluating(null);
+        return;
+      }
+
+      if (!data || typeof data !== "object") {
+        setEvalResults(prev => ({ ...prev, [questionId]: { error: "Invalid response structure from evaluation service" } }));
+        setEvaluating(null);
+        return;
+      }
+
+      if (data.error) {
+        // Handle specifically requested analysis warning fallback if execution otherwise exists
+        const errorMsg = data.failedAnalysis ? "Analysis failed, but execution succeeded" : data.error;
+        setEvalResults(prev => ({ ...prev, [questionId]: { error: errorMsg } }));
+        setEvaluating(null);
+        return;
+      }
+      
       if (data.alreadySubmitted) {
         setEvalResults(prev => ({ ...prev, [questionId]: { error: 'You have already submitted this question.' } }));
         setEvaluating(null);
@@ -208,9 +250,6 @@ export default function StudentPage() {
       
       if (data.status === 'queued' && data.logId) {
         startPolling(questionId, data.logId);
-      } else if (data.error) {
-        setEvalResults(prev => ({ ...prev, [questionId]: { error: data.error } }));
-        setEvaluating(null);
       } else {
         setEvalResults(prev => ({ ...prev, [questionId]: data }));
         if (!data.error) {
@@ -219,7 +258,8 @@ export default function StudentPage() {
         }
         setEvaluating(null);
       }
-    } catch {
+    } catch (err) {
+      console.error("Evaluation request failed:", err);
       setEvalResults(prev => ({ ...prev, [questionId]: { error: 'Network error. Please try again.' } }));
       setEvaluating(null);
     }
@@ -263,463 +303,360 @@ export default function StudentPage() {
   // All submitted screen
   if (allSubmitted) {
     return (
-      <div className="h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950 flex items-center justify-center animate-fade-in relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-emerald-400/20 to-teal-400/10 dark:from-emerald-600/10 dark:to-teal-600/5 rounded-full blur-3xl" />
-        <div className="bg-white/70 dark:bg-slate-800/60 backdrop-blur-xl border border-white/30 dark:border-slate-700/50 rounded-2xl shadow-xl shadow-indigo-100/40 dark:shadow-black/20 p-12 text-center max-w-md transition-all animate-slide-up relative z-10">
-          <div className="text-6xl mb-4">🎉</div>
-          <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-2">Well done{firstName ? `, ${firstName}` : ''}!</h2>
-          <p className="text-slate-500 dark:text-slate-400 text-sm mb-2">Your assessment has been submitted successfully.</p>
-          <p className="text-slate-400 dark:text-slate-500 text-xs mb-6">Your teacher will review your answers shortly. Great effort! 💪</p>
+      <div className="h-screen flex items-center justify-center animate-fade-in relative overflow-hidden">
+        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="glass-premium p-12 text-center max-w-md relative z-10 rounded-[3rem] shadow-2xl">
+          <motion.div initial={{ y: 20 }} animate={{ y: 0 }} transition={{ type: "spring", stiffness: 200, damping: 20 }} className="text-7xl mb-8">🎉</motion.div>
+          <h2 className="text-4xl font-black tracking-tight mb-3 text-foreground italic">Mission Complete!</h2>
+          <p className="text-muted-foreground text-sm mb-8 font-medium leading-relaxed uppercase tracking-widest opacity-80">Your cognitive payload has been encrypted and stored safely. Great effort today, {firstName}!</p>
           {myRank > 0 && (
-            <div className="bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-700/50 rounded-xl p-4 mb-6">
-              <p className="text-indigo-600 dark:text-indigo-400 font-semibold">Current Rank: #{myRank}</p>
-              <p className="text-slate-400 dark:text-slate-500 text-sm">{myScore} points earned</p>
+            <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-[2rem] p-6 mb-10 shadow-inner">
+              <p className="text-indigo-600 dark:text-indigo-400 font-black text-xl mb-1 tracking-tight">Position: #{myRank}</p>
+              <p className="text-muted-foreground text-[10px] font-black uppercase tracking-widest">{myScore} XP Accumulated</p>
             </div>
           )}
-          <button onClick={logout} className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 active:scale-95 text-white font-semibold px-8 py-3 rounded-xl text-sm transition-all hover:scale-[1.02] shadow-lg shadow-indigo-500/25">
-            Logout
-          </button>
-        </div>
+          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={logout} className="premium-gradient text-white font-black px-12 py-5 rounded-2xl shadow-xl shadow-indigo-500/30 uppercase tracking-[0.25em] text-[11px]">
+            Finalize Disconnect
+          </motion.button>
+        </motion.div>
       </div>
     );
   }
 
   return (
-    <div className="h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950 flex flex-col overflow-hidden animate-fade-in">
-      {/* Warning Banner */}
-      {showWarningBanner && (
-        <div className={`flex-shrink-0 flex items-center justify-between px-6 py-2 text-sm font-medium ${
-          tabSwitchCount > 3 ? 'bg-red-500 text-white' : 'bg-amber-400 text-amber-900'
-        }`}>
-          <span>
-            {tabSwitchCount > 0
-              ? `⚠️ Tab switch detected (${tabSwitchCount} time${tabSwitchCount > 1 ? 's' : ''}). This is being recorded.`
-              : '⏱ 5 minutes remaining — save your answers now!'}
-          </span>
-          <button onClick={() => setShowWarningBanner(false)} className="opacity-70 hover:opacity-100 text-xs ml-4">✕ Dismiss</button>
-        </div>
-      )}
-
-      {/* Submit Confirm Modal */}
-      {showSubmitConfirm && (
-        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl dark:shadow-black/40 p-8 max-w-sm w-full border border-white/50 dark:border-slate-700/50 animate-slide-up">
-            <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-2">Submit Assessment?</h3>
-            <p className="text-slate-500 dark:text-slate-400 text-sm mb-2">
-              You have answered <strong>{answeredCount}</strong> of <strong>{questions.length}</strong> questions.
-            </p>
-            {answeredCount < questions.length && (
-              <p className="text-amber-600 dark:text-amber-400 text-sm mb-4">⚠️ {questions.length - answeredCount} question(s) are unanswered.</p>
-            )}
-            <p className="text-slate-400 dark:text-slate-500 text-xs mb-6">Once submitted, you cannot change your answers.</p>
-            <div className="flex gap-3">
-              <button onClick={() => setShowSubmitConfirm(false)}
-                className="flex-1 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 font-semibold py-2.5 rounded-xl text-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
-                Cancel
-              </button>
-              <button onClick={() => handleSubmitAll(true)}
-                className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold py-2.5 rounded-xl text-sm transition-all shadow-lg shadow-indigo-500/25">
-                Submit All
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+    <div className="h-screen flex flex-col overflow-hidden selection:bg-indigo-500/30">
+      {/* Modals & Overlays */}
+      <AnimatePresence mode="wait">
+        {showSubmitConfirm && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-md z-[100] flex items-center justify-center p-6">
+            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} className="glass-premium p-10 max-w-sm w-full rounded-[2.5rem] shadow-2xl">
+              <div className="w-16 h-16 bg-amber-500/10 rounded-2xl flex items-center justify-center text-3xl mb-6 shadow-lg shadow-amber-500/10 border border-amber-500/20">🛰️</div>
+              <h3 className="text-2xl font-black mb-3 leading-none text-foreground">Finalize Transmission?</h3>
+              <p className="text-muted-foreground text-sm mb-8 font-medium leading-relaxed">You've successfully solved <span className="text-indigo-600 dark:text-indigo-400 font-black">{answeredCount}</span> out of <span className="text-foreground font-black">{questions.length}</span> problems. Confirm final submission to log results.</p>
+              <div className="flex flex-col gap-3">
+                <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => handleSubmitAll(true)} className="w-full premium-gradient text-white font-black py-4 rounded-2xl shadow-xl shadow-indigo-500/20 uppercase tracking-widest text-[11px]">Confirm & Submit</motion.button>
+                <button onClick={() => setShowSubmitConfirm(false)} className="w-full px-4 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors">Return to Exam</button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Top Nav */}
-      <nav className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border-b border-white/30 dark:border-slate-700/40 px-6 py-3 flex justify-between items-center flex-shrink-0 shadow-sm z-10">
-        <div className="flex items-center gap-3">
-          <div className="w-7 h-7 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center shadow-md shadow-indigo-500/20">
-            <span className="text-white font-black text-xs">M</span>
+      <nav className="glass border-b border-gray-200 dark:border-white/5 px-8 h-20 flex justify-between items-center flex-shrink-0 z-50">
+        <div className="flex items-center gap-5">
+          <motion.div whileHover={{ rotate: 10 }} className="w-10 h-10 premium-gradient rounded-2xl flex items-center justify-center shadow-xl shadow-indigo-500/20">
+            <span className="text-white font-black text-lg">M</span>
+          </motion.div>
+          <div className="flex flex-col">
+            <span className="font-black text-lg tracking-tight text-foreground">Mentimeter</span>
+            {assessment && <span className="text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase tracking-[0.2em]">{assessment.title as string}</span>}
           </div>
-          <span className="font-bold text-slate-800 dark:text-white text-sm">Mentimeter</span>
-          {assessment && (
-            <span className="text-slate-400 dark:text-slate-500 text-xs hidden sm:block">· {assessment.title as string}</span>
-          )}
         </div>
-        <div className="flex items-center gap-4">
-          {/* Dark mode toggle */}
-          <button onClick={toggleDark}
-            className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-sm hover:scale-110 active:scale-95 transition-all border border-slate-200/50 dark:border-slate-600/50"
-            aria-label="Toggle dark mode">
+
+        <div className="flex items-center gap-8">
+          <motion.button whileHover={{ scale: 1.1, rotate: 5 }} whileTap={{ scale: 0.9 }} onClick={toggleDark} className="w-10 h-10 rounded-2xl bg-gray-100 dark:bg-black/40 border border-gray-200 dark:border-white/5 flex items-center justify-center text-xl shadow-inner text-gray-700 dark:text-gray-300">
             {dark ? '☀️' : '🌙'}
-          </button>
-          {/* Fullscreen button */}
-          {!isFullscreen && assessment && (
-            <button onClick={requestFullscreen}
-              className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 text-xs font-medium border border-slate-200 dark:border-slate-600 px-2.5 py-1 rounded-lg transition-colors">
-              ⛶ Fullscreen
-            </button>
-          )}
-          {/* Timer */}
+          </motion.button>
+
           {timeLeft !== null && (
-            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-mono font-bold ${
-              isDanger ? 'bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-700/50 animate-pulse' :
-              isWarning ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-700/50' :
-              'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600'
+            <div className={`px-6 py-2.5 rounded-2xl text-[11px] font-black tracking-[0.1em] border-2 transition-all duration-300 flex items-center gap-3 ${
+              isDanger ? 'bg-red-500/10 text-red-500 border-red-500 animate-pulse' :
+              isWarning ? 'bg-amber-500/10 text-amber-500 border-amber-500' :
+              'bg-indigo-500/5 text-indigo-600 dark:text-indigo-400 border-indigo-500/20 shadow-sm'
             }`}>
-              ⏱ {formatTime(timeLeft)}
+              <span className="opacity-60 font-black">EXPIRES IN</span>
+              <span className="text-base tabular-nums">{formatTime(timeLeft)}</span>
             </div>
           )}
-          {/* Progress */}
-          {assessment && (
-            <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-              <div className="w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-500"
-                  style={{ width: `${questions.length ? (answeredCount / questions.length) * 100 : 0}%` }} />
+
+          <div className="hidden xl:flex flex-col items-end gap-2">
+            <div className="flex items-center gap-4">
+              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Status {answeredCount}/{questions.length}</span>
+              <div className="w-40 h-2 bg-gray-200 dark:bg-white/5 rounded-full overflow-hidden p-0.5 border border-gray-200 dark:border-white/5">
+                <motion.div initial={{ width: 0 }} animate={{ width: `${questions.length ? (answeredCount / questions.length) * 100 : 0}%` }} className="h-full premium-gradient rounded-full" />
               </div>
-              <span>{answeredCount}/{questions.length}</span>
             </div>
-          )}
-          {myRank > 0 && (
-            <span className="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">
-              #{myRank} · <span className="text-indigo-600 dark:text-indigo-400 font-semibold">{myScore}pts</span>
-            </span>
-          )}
-          <span className="text-slate-600 dark:text-slate-300 text-xs hidden sm:block font-semibold">
-            {firstName ? `Hi, ${firstName}!` : name}
-          </span>
-          <button onClick={logout} className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 text-xs font-medium transition-colors">Logout</button>
+            {myRank > 0 && <span className="text-[10px] font-black tracking-widest uppercase text-indigo-500">Live Ranking #{myRank}</span>}
+          </div>
+
+          <div className="h-10 w-[1px] bg-gray-200 dark:bg-white/5 mx-2" />
+
+          <div className="flex items-center gap-4 group cursor-pointer">
+            <div className="flex flex-col items-end">
+              <span className="text-sm font-black leading-none text-foreground">Hi, {firstName}</span>
+              <button onClick={logout} className="text-[9px] font-black text-muted-foreground hover:text-red-500 transition-colors uppercase tracking-[0.2em] mt-1.5 opacity-60 hover:opacity-100">Terminate Session</button>
+            </div>
+            <div className="w-11 h-11 premium-gradient rounded-2xl flex items-center justify-center text-white font-black shadow-xl shadow-indigo-500/10 border-2 border-white dark:border-gray-800 relative">
+              <span className="text-lg">{name.charAt(0).toUpperCase()}</span>
+              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-white dark:border-gray-900 rounded-full" />
+            </div>
+          </div>
         </div>
       </nav>
 
-      {/* Tabs */}
-      <div className="bg-white/70 dark:bg-slate-900/50 backdrop-blur-md border-b border-white/30 dark:border-slate-700/40 px-6 flex-shrink-0">
-        <div className="flex gap-0">
-          {([['questions', '📝 Questions'], ['leaderboard', '🏆 Leaderboard']] as const).map(([t, label]) => (
-            <button key={t} onClick={() => setTab(t)}
-              className={`px-5 py-3 text-sm font-semibold border-b-2 transition-all -mb-px ${
-                tab === t ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400' : 'border-transparent text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'
-              }`}>
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Questions Tab */}
-      {tab === 'questions' && (
-        <div className="flex flex-1 overflow-hidden">
-          {!loading && !assessment ? (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center animate-slide-up">
-                <div className="text-6xl mb-4">⏳</div>
-                <h2 className="text-xl font-bold text-slate-700 dark:text-slate-200 mb-2">
-                  {firstName ? `Hey ${firstName}!` : 'Hey!'} Waiting for assessment...
-                </h2>
-                <p className="text-slate-400 dark:text-slate-500 text-sm">Your teacher will launch one soon. This page refreshes automatically.</p>
-              </div>
+      {/* Main Container */}
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Sidebar */}
+        <aside className="w-80 glass border-r border-gray-200 dark:border-white/5 p-8 flex flex-col gap-8 flex-shrink-0 relative z-40">
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h3 className="text-[10px] font-black uppercase tracking-[0.25em] text-muted-foreground opacity-60">Session Matrix</h3>
+              <span className="text-[9px] bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 px-3 py-1 rounded-lg font-black uppercase tracking-widest border border-indigo-500/20">{questions.length} Problems</span>
             </div>
-          ) : assessment && (
-            <>
-              {/* Left Sidebar */}
-              <div className="w-64 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm border-r border-white/30 dark:border-slate-700/40 flex flex-col flex-shrink-0">
-                {/* Greeting + Progress */}
-                <div className="p-4 border-b border-slate-100 dark:border-slate-700/50">
-                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">
-                    {firstName ? `Go ${firstName}! 🚀` : 'Keep going! 🚀'}
-                  </p>
-                  <div className="h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mb-2">
-                    <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-500"
-                      style={{ width: `${questions.length ? (answeredCount / questions.length) * 100 : 0}%` }} />
-                  </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">{answeredCount} of {questions.length} answered</p>
-                  <p className="text-xs text-indigo-500 dark:text-indigo-400 mt-1 italic">{getEncouragement(answeredCount, questions.length, timeLeft)}</p>
-                </div>
-                {/* Legend */}
-                <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700/50 flex gap-3 text-xs text-slate-400 dark:text-slate-500">
-                  <span className="flex items-center gap-1">
-                    <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block" />Answered
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span className="w-2.5 h-2.5 rounded-sm bg-slate-200 dark:bg-slate-600 inline-block" />Not yet
-                  </span>
-                </div>
-                {/* Question List */}
-                <div className="flex-1 overflow-y-auto p-3 space-y-1">
-                  {questions.map((q: any, i: number) => {
-                    const isAnswered = !!(answeredMap[q.id as number]?.answer_text || draftAnswers[q.id as number]?.trim());
-                    const isActive = i === activeQ;
-                    return (
-                      <button key={q.id as number} onClick={() => setActiveQ(i)}
-                        className={`w-full text-left px-4 py-3 rounded-xl text-sm transition-all flex items-center gap-3 border ${
-                          isActive ? 'bg-white dark:bg-slate-800 shadow-lg shadow-indigo-100/60 dark:shadow-black/30 text-indigo-700 dark:text-indigo-400 border-indigo-100 dark:border-indigo-700/50 scale-[1.03] z-10 my-0.5' :
-                          isAnswered ? 'text-emerald-700 dark:text-emerald-400 hover:bg-white/60 dark:hover:bg-slate-800/50 hover:shadow-sm border-transparent' :
-                          'text-slate-600 dark:text-slate-400 hover:bg-white/40 dark:hover:bg-slate-800/30 hover:shadow-sm border-transparent'
-                        }`}>
-                        <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0 shadow-sm ${
-                          isAnswered ? 'bg-gradient-to-br from-emerald-400 to-emerald-600 text-white' :
-                          isActive ? 'bg-gradient-to-br from-indigo-500 to-indigo-700 text-white shadow-indigo-200/50' :
-                          'bg-slate-200/70 dark:bg-slate-600/50 text-slate-500 dark:text-slate-400'
-                        }`}>
-                          {isAnswered ? '✓' : i + 1}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <p className="truncate font-medium">Q{i + 1}</p>
-                          <p className="text-xs opacity-60">{q.max_marks as number} marks</p>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-                {/* Submit All */}
-                <div className="p-3 border-t border-slate-100 dark:border-slate-700/50">
-                  <button onClick={() => handleSubmitAll(false)}
-                    className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 active:scale-95 text-white text-xs font-semibold py-2.5 rounded-xl transition-all shadow-lg shadow-indigo-500/25 hover:scale-[1.02]">
-                    Submit All Answers
-                  </button>
-                  {tabSwitchCount > 0 && (
-                    <p className="text-xs text-red-500 dark:text-red-400 text-center mt-2">
-                      ⚠️ {tabSwitchCount} tab switch{tabSwitchCount > 1 ? 'es' : ''} recorded
-                    </p>
-                  )}
-                </div>
-              </div>
+            
+            <div className="flex gap-1.5 p-1.5 bg-gray-100 dark:bg-black/40 rounded-2xl border border-gray-200/50 dark:border-white/5 shadow-inner">
+              <button onClick={() => setTab('questions')} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${tab === 'questions' ? 'bg-white dark:bg-gray-800 shadow-xl text-indigo-600 dark:text-indigo-400 border border-gray-200 dark:border-white/5' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}>Challenges</button>
+              <button onClick={() => setTab('leaderboard')} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${tab === 'leaderboard' ? 'bg-white dark:bg-gray-800 shadow-xl text-indigo-600 dark:text-indigo-400 border border-gray-200 dark:border-white/5' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}>Standings</button>
+            </div>
+          </div>
 
-              {/* Right — Question Detail */}
-              <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
+            {tab === 'questions' ? questions.map((q, i) => {
+              const ans = answeredMap[q.id as number];
+              const acts = activeQ === i;
+              return (
+                <motion.button key={q.id as number} whileHover={{ x: 6 }} whileTap={{ scale: 0.98 }} onClick={() => setActiveQ(i)} 
+                  className={`w-full group text-left p-5 rounded-2xl border-2 transition-all flex items-center gap-5 relative overflow-hidden ${
+                    acts ? 'bg-white dark:bg-indigo-500/10 border-indigo-500/50 shadow-2xl shadow-indigo-500/10' :
+                    ans ? 'bg-emerald-500/5 dark:bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400' :
+                    'bg-gray-50 dark:bg-black/20 border-gray-200 dark:border-white/5 text-gray-500 dark:text-slate-500 hover:bg-white dark:hover:bg-slate-800/40 hover:border-indigo-500/30'
+                  }`}>
+                  
+                  {acts && <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/5 blur-2xl rounded-full translate-x-12 -translate-y-12" />}
+                  
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-[11px] transition-all duration-300 ${
+                    acts ? 'premium-gradient text-white shadow-lg shadow-indigo-500/20 rotate-3' :
+                    ans ? 'bg-emerald-500 text-white' :
+                    'bg-gray-200 dark:bg-gray-800 text-gray-500 dark:text-slate-500 group-hover:bg-indigo-500 group-hover:text-white group-hover:rotate-6'
+                  }`}>
+                    {ans ? '✓' : String(i + 1).padStart(2, '0')}
+                  </div>
+                  <div className="flex-1 min-w-0 relative z-10">
+                    <p className={`text-sm font-black truncate leading-tight tracking-tight ${acts ? 'text-foreground' : ''}`}>Question {i + 1}</p>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-indigo-500/70">{q.max_marks as number} PTS</span>
+                      <span className="w-1 h-1 rounded-full bg-slate-400 opacity-30" />
+                      <span className="text-[9px] font-black uppercase tracking-widest opacity-60 truncate">{q.question_type as string}</span>
+                    </div>
+                  </div>
+
+                  {acts && (
+                    <div className="w-1.5 h-6 bg-indigo-500 rounded-full absolute left-0" />
+                  )}
+                </motion.button>
+              );
+            }) : (
+              <div className="space-y-3">
+                {leaderboard.slice(0, 5).map((s, i) => (
+                  <div key={i} className="p-4 bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/5 rounded-2xl flex items-center gap-4 transition-all hover:bg-white dark:hover:bg-white/5">
+                    <span className={`text-[10px] font-black w-6 h-6 rounded-lg flex items-center justify-center ${i === 0 ? 'bg-amber-500/10 text-amber-500' : 'bg-gray-200 dark:bg-gray-800 text-muted-foreground'}`}>#{i+1}</span>
+                    <span className="text-xs font-black truncate flex-1 text-foreground">{s.name as string}</span>
+                    <span className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-md">{s.score as number} XP</span>
+                  </div>
+                ))}
+                <button onClick={() => setTab('leaderboard')} className="w-full py-4 text-[10px] font-black uppercase tracking-widest text-indigo-500 hover:text-indigo-400 transition-colors flex items-center justify-center gap-2 group">
+                  Global Metrics <span className="group-hover:translate-x-1 transition-transform">→</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="pt-8 border-t border-gray-100 dark:border-white/5 space-y-4">
+            <motion.div initial={false} animate={{ opacity: isWarning ? 1 : 0.8 }} className="p-5 bg-gray-50 dark:bg-black/20 rounded-3xl border border-gray-200/50 dark:border-white/5 shadow-inner">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-500 mb-2 opacity-80">System Analytics</p>
+              <p className="text-xs font-black italic line-clamp-2 leading-relaxed text-foreground opacity-90">{getEncouragement(answeredCount, questions.length, timeLeft)}</p>
+            </motion.div>
+            
+            {activeQ === questions.length - 1 && (
+              <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => setShowSubmitConfirm(true)} className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black text-[11px] shadow-xl shadow-emerald-500/20 uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-3">
+                <span className="text-lg">🏁</span> Finalize Assessment
+              </motion.button>
+            )}
+          </div>
+        </aside>
+
+        {/* Dynamic Content */}
+        <main className="flex-1 overflow-y-auto p-12 lg:p-16 relative flex flex-col items-center custom-scrollbar">
+          <AnimatePresence mode="wait">
+            {tab === 'questions' ? (
+              <motion.div key={activeQ} initial={{ opacity: 0, scale: 0.99, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ type: "spring", stiffness: 100, damping: 20 }} className="w-full max-w-5xl">
                 {questions[activeQ] && (() => {
                   const q = questions[activeQ];
                   const qid = q.id as number;
-                  const submitted = answeredMap[qid];
-                  const draft = draftAnswers[qid] ?? (submitted?.answer_text as string) ?? '';
-                  const isSubmitted = !!(submitted?.answer_text);
-                  const isReviewed = submitted?.reviewed;
-                  const marksAwarded = submitted?.marks_awarded;
-
-                  const isEvaluatingQ = evaluating === qid || (polls[qid] && (polls[qid].status === 'queued' || polls[qid].status === 'running'));
-                  const evaluatingStatusText = polls[qid]?.status === 'queued' ? 'Queued...' : polls[qid]?.status === 'running' ? 'Running test cases...' : 'Processing submission...';
+                  const res = evalResults[qid];
+                  const isEval = evaluating === qid || (polls[qid] && (polls[qid].status === 'queued' || polls[qid].status === 'running'));
+                  const ans = answeredMap[qid];
+                  const isSub = !!ans?.answer_text;
+                  const draft = draftAnswers[qid] ?? ans?.answer_text ?? '';
 
                   return (
-                    <div className="p-8 max-w-3xl animate-fade-in">
-                      {/* Question Header */}
-                      <div className="flex items-start justify-between gap-4 mb-6">
-                        <div>
-                          <div className="flex items-center gap-2 mb-2 flex-wrap">
-                            <span className="text-indigo-600 dark:text-indigo-400 text-xs font-bold uppercase tracking-wider">
-                              Question {activeQ + 1} of {questions.length}
-                            </span>
-                            <span className="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs px-2.5 py-0.5 rounded-full font-medium">
-                              {q.max_marks as number} marks
-                            </span>
-                            {isReviewed && (
-                              <span className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-700/50 text-xs px-2 py-0.5 rounded-full font-semibold">
-                                {marksAwarded as number}/{q.max_marks as number} awarded ✓
-                              </span>
-                            )}
-                            {isSubmitted && !isReviewed && (
-                              <span className="bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-700/50 text-xs px-2 py-0.5 rounded-full font-semibold">
-                                Submitted · Pending review
-                              </span>
-                            )}
-                          </div>
-                          <h2 className="text-slate-800 dark:text-white text-lg font-semibold leading-relaxed">{q.question_text as string}</h2>
+                    <div className="space-y-12">
+                      <header className="space-y-6">
+                        <div className="flex flex-wrap items-center gap-4">
+                          <span className="px-4 py-1.5 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase tracking-[0.25em] rounded-xl border border-indigo-500/20 shadow-sm">Module {String(activeQ+1).padStart(2, '0')}</span>
+                          <span className="px-4 py-1.5 bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-slate-400 text-[10px] font-black uppercase tracking-widest rounded-xl border border-gray-200 dark:border-white/5">{q.max_marks as number} Weightage</span>
+                          {ans?.reviewed && <span className="px-4 py-1.5 bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg shadow-emerald-500/20">Evaluation: {ans.marks_awarded as number} PTS</span>}
                         </div>
-                      </div>
-
-                      {/* Answer Box */}
-                      {q.question_type === 'code' ? (
-                        // ── Code Question ────────────────────────────────────
                         <div className="space-y-4">
-                          <div className="flex items-center justify-between">
-                            <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
-                              Your Code
-                            </label>
-                            {isSubmitted && (
-                              <span className="bg-emerald-900/40 text-emerald-400 border border-emerald-500/30 text-xs px-2.5 py-1 rounded-full font-medium">
-                                ✓ Submitted
-                              </span>
-                            )}
+                          <h2 className="text-4xl lg:text-5xl font-black tracking-tight text-balance leading-[1.15] text-foreground italic">{q.question_text as string}</h2>
+                          <div className="flex items-center gap-3 opacity-60">
+                            <span className="w-8 h-0.5 bg-indigo-500 rounded-full" />
+                            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Optimal performance expected • Secure Environment active</p>
                           </div>
+                        </div>
+                      </header>
 
-                          <CodeEditor
-                            value={codeDrafts[qid]?.code ?? (isSubmitted ? (submitted?.answer_text as string ?? '') : getStarterCode(qid, codeDrafts[qid]?.languageId ?? LANGUAGES[0].id))}
-                            languageId={codeDrafts[qid]?.languageId ?? LANGUAGES[0].id}
-                            disabled={isSubmitted}
-                            onChange={(code) =>
-                              setCodeDrafts(prev => ({ ...prev, [qid]: { ...prev[qid], code, languageId: prev[qid]?.languageId ?? LANGUAGES[0].id } }))
-                            }
-                            onLanguageChange={(lang: Language) =>
-                              setCodeDrafts(prev => ({
-                                ...prev,
-                                [qid]: {
-                                  code: getStarterCode(qid, lang.id),
-                                  languageId: lang.id,
-                                },
-                              }))
-                            }
-                          />
-
-                          {/* Submit button + status */}
-                          {!isSubmitted && (
-                            <div className="flex items-center justify-between pt-1">
-                              <div className="text-xs text-slate-400 dark:text-slate-500">
-                                {isEvaluatingQ && (
-                                  <span className="flex items-center gap-1.5 text-indigo-400">
-                                    <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
-                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                                    </svg>
-                                    {evaluatingStatusText}
-                                  </span>
-                                )}
+                      <div className="space-y-8">
+                        {q.question_type === 'code' ? (
+                          <div className="space-y-8">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-500 text-sm">💻</div>
+                                <h4 className="text-xs font-black uppercase tracking-[0.2em] text-foreground opacity-80">Logic Implementation</h4>
                               </div>
-                              <button
-                                id={`submit-code-${qid}`}
-                                onClick={() => evaluateCode(qid)}
-                                disabled={isEvaluatingQ || !codeDrafts[qid]?.code?.trim()}
-                                className="inline-flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 active:scale-95 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition-all shadow-lg shadow-indigo-500/25 disabled:opacity-40 disabled:cursor-not-allowed hover:scale-[1.02]"
-                              >
-                                {isEvaluatingQ ? (
-                                  <><svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Running...</>
-                                ) : (
-                                  <>▶ Run &amp; Submit</>
-                                )}
-                              </button>
+                              {isSub && (
+                                <div className="px-4 py-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-black text-[10px] uppercase tracking-widest rounded-xl flex items-center gap-3 border border-emerald-500/20 shadow-sm">
+                                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Read-Only Mode
+                                </div>
+                              )}
                             </div>
-                          )}
-
-                          {/* Evaluation result card — show skeleton while evaluating, card once done */}
-                          {isEvaluatingQ ? (
-                            <EvalResultSkeleton statusText={evaluatingStatusText} />
-                          ) : evalResults[qid] ? (
-                            evalResults[qid].error ? (
-                              <div className="bg-red-950/40 border border-red-500/30 text-red-400 rounded-xl px-4 py-3 text-sm">
-                                ⚠️ {evalResults[qid].error}
-                              </div>
-                            ) : (
-                              <EvalResultCard
-                                result={evalResults[qid]}
-                                onDismiss={() => setEvalResults(prev => { const n = { ...prev }; delete n[qid]; return n; })}
+                            
+                            <div className="relative group p-1.5 rounded-[2.5rem] bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/5 shadow-2xl transition-all duration-700 hover:ring-2 ring-indigo-500/20">
+                              <CodeEditor
+                                value={codeDrafts[qid]?.code ?? (isSub ? (ans.answer_text ?? '') : getStarterCode(qid, codeDrafts[qid]?.languageId ?? LANGUAGES[0].id))}
+                                languageId={codeDrafts[qid]?.languageId ?? LANGUAGES[0].id}
+                                disabled={isSub}
+                                onChange={(c) => setCodeDrafts(p => ({ ...p, [qid]: { ...p[qid], code: c, languageId: p[qid]?.languageId ?? LANGUAGES[0].id } }))}
+                                onLanguageChange={(l) => setCodeDrafts(p => ({ ...p, [qid]: { code: getStarterCode(qid, l.id), languageId: l.id } }))}
                               />
-                            )
-                          ) : null}
-                        </div>
-                      ) : (
-                        // ── Text Question (original UI) ───────────────────────
-                        <div className="space-y-3">
-                          <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
-                            Your Answer
-                          </label>
-                          <textarea
-                            value={draft}
-                            onChange={e => setDraftAnswers(prev => ({ ...prev, [qid]: e.target.value }))}
-                            disabled={isSubmitted}
-                            rows={8}
-                            placeholder="Type your answer here..."
-                            className={`w-full border rounded-2xl px-6 py-5 text-slate-800 dark:text-white text-base leading-relaxed focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 transition-all resize-none ${
-                              isSubmitted
-                                ? 'bg-slate-50/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed'
-                                : 'bg-white/60 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-md focus:bg-white dark:focus:bg-slate-800 placeholder-slate-300 dark:placeholder-slate-600'
-                            }`}
-                          />
-                          <div className="flex items-center justify-between">
-                            <div>
-                              {savedAt[qid] && (
-                                <p className="text-xs text-emerald-600 dark:text-emerald-400">✓ Saved at {savedAt[qid]}</p>
-                              )}
-                              {!isSubmitted && draft?.trim() && !savedAt[qid] && (
-                                <p className="text-xs text-slate-400 dark:text-slate-500">Unsaved changes</p>
-                              )}
                             </div>
-                            {!isSubmitted && (
-                              <button onClick={() => saveAnswer(qid)}
-                                disabled={saving === qid || !draft?.trim()}
-                                className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 active:scale-95 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition-all shadow-lg shadow-indigo-500/25 hover:scale-[1.02] disabled:opacity-40 disabled:hover:scale-100">
-                                {saving === qid ? 'Saving...' : 'Save Answer'}
-                              </button>
+
+                            {!isSub && (
+                              <div className="flex items-center justify-between gap-8 py-6 px-8 rounded-3xl bg-gray-50 dark:bg-indigo-500/5 border border-gray-200 dark:border-indigo-500/20">
+                                <div className="space-y-1.5">
+                                  <p className="text-xs font-black text-foreground uppercase tracking-wider">Execute Validation Suite</p>
+                                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest leading-relaxed max-w-xs">Code execution will verify logic & automate final grading.</p>
+                                </div>
+                                <motion.button whileHover={{ scale: 1.05, filter: "brightness(1.1)" }} whileTap={{ scale: 0.95 }} onClick={() => evaluateCode(qid)} disabled={isEval || !codeDrafts[qid]?.code?.trim()} className={`relative overflow-hidden premium-gradient text-white px-10 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-2xl flex items-center gap-4 transition-all ${isEval ? 'opacity-50 cursor-not-allowed grayscale' : 'shadow-indigo-500/30'}`}>
+                                  {isEval ? (
+                                    <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> {polls[qid]?.status === 'queued' ? 'In queue...' : 'Processing...'}</>
+                                  ) : (
+                                    <><span className="text-base leading-none">🚀</span> Commit & Run</>
+                                  )}
+                                </motion.button>
+                              </div>
+                            )}
+
+                            <AnimatePresence>
+                              {isEval && <EvalResultSkeleton key="skeleton" statusText={polls[qid]?.status === 'queued' ? `Synchronizing your request, ${firstName}...` : `Evaluating logic matrix, ${firstName}...`} />}
+                              {!isEval && res && (
+                                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", damping: 25 }}>
+                                  {res.error ? (
+                                    <div className="p-8 rounded-[2rem] border-2 border-red-500/20 bg-red-500/5 text-red-600 dark:text-red-400 font-black text-xs shadow-2xl flex items-center gap-4">
+                                      <span className="text-2xl">⚠️</span>
+                                      <div className="flex flex-col gap-1">
+                                        <span className="uppercase tracking-[0.2em] opacity-60 text-[10px]">Evaluation Error</span>
+                                        {res.error}
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <EvalResultCard 
+                                      result={res} 
+                                      userName={firstName}
+                                      onDismiss={() => setEvalResults(p => { const n = { ...p }; delete n[qid]; return n; })} 
+                                    />
+                                  )}
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
+                        ) : (
+                          <div className="space-y-6">
+                            <div className="flex items-center justify-between px-2">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-500 text-sm">📝</div>
+                                <h4 className="text-xs font-black uppercase tracking-[0.2em] text-foreground opacity-80">Theoretical Discourse</h4>
+                              </div>
+                              {savedAt[qid] && <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Auto-Synced @ {savedAt[qid]}</span>}
+                            </div>
+                            
+                            <div className="relative p-1 rounded-[2.5rem] bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/5 shadow-2xl focus-within:ring-2 ring-indigo-500/20 transition-all duration-300">
+                              <textarea
+                                value={draft}
+                                onChange={e => setDraftAnswers(p => ({ ...p, [qid]: e.target.value }))}
+                                disabled={isSub}
+                                rows={12}
+                                placeholder="Express your conceptual architectural logic here..."
+                                className="w-full bg-transparent border-none focus:ring-0 p-10 text-lg font-medium leading-relaxed resize-none custom-scrollbar text-foreground placeholder-muted-foreground/30"
+                              />
+                            </div>
+
+                            {!isSub && (
+                              <div className="flex justify-end pt-4">
+                                <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => saveAnswer(qid)} disabled={saving === qid || !draft?.trim()} className="px-12 py-5 bg-foreground text-background font-black rounded-2xl text-[11px] uppercase tracking-[0.25em] shadow-2xl transition-all hover:bg-slate-800 dark:hover:bg-slate-200 flex items-center gap-3">
+                                  {saving === qid ? (
+                                    <><div className="w-3 h-3 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /> Recording...</>
+                                  ) : (
+                                    <><span className="text-lg">💾</span> Synchronize Progress</>
+                                  )}
+                                </motion.button>
+                              </div>
                             )}
                           </div>
-                        </div>
-                      )}
-
-                      {/* Navigation */}
-                      <div className="flex gap-3 mt-8 pt-6 border-t border-slate-100 dark:border-slate-700/50">
-                        {activeQ > 0 && (
-                          <button onClick={() => setActiveQ(i => i - 1)}
-                            className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-500 rounded-xl text-sm font-medium transition-all hover:shadow-sm">
-                            ← Previous
-                          </button>
-                        )}
-                        {activeQ < questions.length - 1 && (
-                          <button onClick={() => setActiveQ(i => i + 1)}
-                            className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-500 rounded-xl text-sm font-medium transition-all hover:shadow-sm">
-                            Next →
-                          </button>
-                        )}
-                        {activeQ === questions.length - 1 && (
-                          <button onClick={() => handleSubmitAll(false)}
-                            className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white rounded-xl text-sm font-semibold transition-all shadow-lg shadow-emerald-500/20 hover:scale-[1.02]">
-                            Submit All ✓
-                          </button>
                         )}
                       </div>
+
+                      <footer className="pt-16 border-t border-gray-100 dark:border-white/5 flex flex-wrap items-center justify-between gap-8">
+                        <div className="flex gap-4">
+                          <button onClick={() => setActiveQ(i => i - 1)} disabled={activeQ === 0} className="px-10 py-4 rounded-2xl border-2 border-gray-200 dark:border-white/10 font-black text-[11px] uppercase tracking-widest bg-white dark:bg-slate-900/50 hover:bg-gray-50 dark:hover:bg-slate-800 transition-all disabled:opacity-20 shadow-sm flex items-center gap-2">← Previous</button>
+                          <button onClick={() => setActiveQ(i => i + 1)} disabled={activeQ === questions.length - 1} className="px-10 py-4 rounded-2xl border-2 border-gray-200 dark:border-white/10 font-black text-[11px] uppercase tracking-widest bg-white dark:bg-slate-900/50 hover:bg-gray-50 dark:hover:bg-slate-800 transition-all disabled:opacity-20 shadow-sm flex items-center gap-2">Next Module →</button>
+                        </div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground opacity-40 italic">System integrity verified • End-to-end encryption active</p>
+                      </footer>
                     </div>
                   );
                 })()}
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Leaderboard Tab */}
-      {tab === 'leaderboard' && (
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-2xl mx-auto">
-            {myRank > 0 && (
-              <div className="bg-white/70 dark:bg-slate-800/60 backdrop-blur-xl border border-indigo-200/50 dark:border-indigo-700/40 rounded-2xl p-5 mb-6 flex items-center gap-4 shadow-lg shadow-indigo-100/40 dark:shadow-black/20 hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/5 to-purple-500/5 dark:from-indigo-500/10 dark:to-purple-500/10 pointer-events-none" />
-                <div className="text-3xl font-black text-indigo-600 dark:text-indigo-400 relative">#{myRank}</div>
-                <div className="relative">
-                  <p className="font-bold text-lg text-slate-800 dark:text-white">{firstName ? `${firstName}'s Rank` : 'Your Rank'}</p>
-                  <p className="text-slate-400 dark:text-slate-500 text-sm">{myScore} points earned so far</p>
+              </motion.div>
+            ) : (
+              <motion.div key="leaderboard" initial={{ opacity: 0, scale: 0.95, y: 30 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ type: "spring", damping: 25 }} className="w-full max-w-5xl space-y-12">
+                <header className="text-center space-y-4">
+                  <div className="inline-block px-5 py-2 bg-indigo-500/10 text-indigo-500 rounded-full font-black text-[10px] uppercase tracking-[0.3em] mb-4">Live Matrix Rankings</div>
+                  <h2 className="text-5xl font-black tracking-tight italic text-foreground">Elite Performance</h2>
+                  <p className="text-muted-foreground font-medium uppercase tracking-widest text-xs opacity-60">Global Synchronization active • Real-time competitive metrics</p>
+                </header>
+                <div className="glass-premium rounded-[3rem] overflow-hidden border border-gray-200 dark:border-white/5 shadow-2xl relative">
+                  <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/5 blur-[100px] rounded-full translate-x-1/2 -translate-y-1/2" />
+                  <table className="w-full text-left border-collapse relative z-10">
+                    <thead>
+                      <tr className="bg-gray-50/50 dark:bg-white/5 border-b border-gray-100 dark:border-white/5">
+                        <th className="px-10 py-8 text-[10px] font-black uppercase tracking-[0.25em] text-slate-500">Tier</th>
+                        <th className="px-10 py-8 text-[10px] font-black uppercase tracking-[0.25em] text-slate-500">Operator Identifier</th>
+                        <th className="px-10 py-8 text-[10px] font-black uppercase tracking-[0.25em] text-slate-500 text-right">XP Yield</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+                      {leaderboard.map((s, i) => (
+                        <tr key={i} className={`transition-all duration-300 hover:bg-white/5 group ${s.name === currentUser ? 'bg-indigo-500/5 dark:bg-indigo-500/10' : ''}`}>
+                          <td className="px-10 py-7">
+                            <span className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-xs transition-transform group-hover:scale-110 ${i === 0 ? 'bg-amber-400 text-black shadow-lg shadow-amber-500/20' : i === 1 ? 'bg-slate-300 text-black shadow-lg shadow-slate-500/20' : i === 2 ? 'bg-amber-700 text-white shadow-lg shadow-amber-800/20' : 'bg-gray-100 dark:bg-slate-800 text-slate-500 group-hover:bg-indigo-500 group-hover:text-white'}`}>{i + 1}</span>
+                          </td>
+                          <td className="px-10 py-7">
+                            <div className="flex items-center gap-4">
+                              <span className="font-black text-lg text-foreground tracking-tight group-hover:translate-x-1 transition-transform">{s.name as string}</span>
+                              {s.name === currentUser && <span className="text-[9px] font-black bg-indigo-500 text-white px-3 py-1 rounded-lg uppercase tracking-widest shadow-lg shadow-indigo-500/20">Active Operator</span>}
+                            </div>
+                          </td>
+                          <td className="px-10 py-7 font-black text-right text-xl text-indigo-600 dark:text-indigo-400 tabular-nums tracking-tighter group-hover:scale-105 transition-transform">{s.score as number}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              </div>
+              </motion.div>
             )}
-            {!assessment && (
-              <div className="text-center py-10 text-slate-400 dark:text-slate-500 text-sm">No active assessment.</div>
-            )}
-            <div className="space-y-2">
-              {leaderboard.map((s: any, i: number) => {
-                const isMe = s.name === currentUser;
-                const medals = ['🥇', '🥈', '🥉'];
-                return (
-                  <div key={s.usn as string}
-                    className={`border rounded-2xl p-4 flex items-center gap-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg backdrop-blur-lg relative overflow-hidden ${
-                      isMe ? 'border-indigo-300/50 dark:border-indigo-600/40 bg-indigo-50/60 dark:bg-indigo-900/20 shadow-indigo-100/40 dark:shadow-indigo-900/30' :
-                      i === 0 ? 'border-amber-200/50 dark:border-amber-700/40 bg-gradient-to-r from-amber-50/70 to-white/50 dark:from-amber-900/20 dark:to-slate-800/50 shadow-amber-100/50' :
-                      i === 1 ? 'border-slate-300/50 dark:border-slate-600/40 bg-gradient-to-r from-slate-100/70 to-white/50 dark:from-slate-800/50 dark:to-slate-800/30 shadow-sm' :
-                      i === 2 ? 'border-orange-200/50 dark:border-orange-700/40 bg-gradient-to-r from-orange-50/70 to-white/50 dark:from-orange-900/20 dark:to-slate-800/50 shadow-sm' :
-                      'border-white/40 dark:border-slate-700/40 bg-white/60 dark:bg-slate-800/40 shadow-sm'
-                    }`}>
-                    {i < 3 && <div className={`absolute inset-0 pointer-events-none ${
-                      i === 0 ? 'bg-gradient-to-r from-amber-400/5 to-transparent' :
-                      i === 1 ? 'bg-gradient-to-r from-slate-400/5 to-transparent' :
-                      'bg-gradient-to-r from-orange-400/5 to-transparent'
-                    }`} />}
-                    <div className="w-10 text-center relative">
-                      {i < 3
-                        ? <span className="text-2xl drop-shadow-sm">{medals[i]}</span>
-                        : <span className="text-slate-400 dark:text-slate-500 font-bold text-sm">#{i + 1}</span>}
-                    </div>
-                    <div className="flex-1 relative">
-                      <p className={`font-semibold text-sm ${isMe ? 'text-indigo-700 dark:text-indigo-400' : 'text-slate-800 dark:text-slate-200'}`}>
-                        {s.name as string}{isMe && <span className="text-indigo-400 dark:text-indigo-500 font-normal text-xs ml-1">(You)</span>}
-                      </p>
-                      <p className="text-slate-400 dark:text-slate-500 text-xs font-mono">{s.usn as string} · {s.answered as number}/{s.total_questions as number} answered</p>
-                    </div>
-                    <div className="text-right relative">
-                      <p className={`text-xl font-black tabular-nums ${isMe ? 'text-indigo-600 dark:text-indigo-400' : i === 0 ? 'text-amber-600 dark:text-amber-400' : 'text-indigo-600 dark:text-indigo-400'}`}>{(s.score as number) || 0}</p>
-                      <p className="text-slate-400 dark:text-slate-500 text-xs">/ {s.total_marks as number} marks</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
+          </AnimatePresence>
+        </main>
+      </div>
     </div>
   );
 }

@@ -5,7 +5,13 @@ import db from '@/lib/db';
 import { sessionOptions, SessionData } from '@/lib/session';
 
 export async function POST(req: NextRequest) {
-  const { username, password, role } = await req.json();
+  let body: any;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+  const { username, password, role } = body;
 
   let user: Record<string, unknown> | undefined;
 

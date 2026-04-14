@@ -50,16 +50,27 @@ export async function GET(req: NextRequest) {
 
   // Completion resolving exactly as previous synchronous model evaluated.
   if (log.status === 'completed') {
+    if (!log.result_payload || log.result_payload.trim() === "") {
+      return NextResponse.json({
+        status: 'error',
+        error: 'Evaluation completed but returned an empty result payload.',
+      });
+    }
+
     try {
       const payload = JSON.parse(log.result_payload);
+      if (!payload || typeof payload !== "object") {
+        throw new Error("Invalid payload structure");
+      }
       return NextResponse.json({
         status: 'completed',
         data: payload,
       });
     } catch (e) {
+      console.error("[status-api] Failed to parse result_payload:", log.result_payload);
       return NextResponse.json({
         status: 'error',
-        error: 'Evaluation succeeded but parsing results failed critically.',
+        error: 'Evaluation succeeded but the results were malformed.',
       });
     }
   }

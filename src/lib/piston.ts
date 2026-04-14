@@ -257,14 +257,19 @@ export async function fetchPistonRuntimes(): Promise<PistonRuntime[]> {
   });
 
   const text = await res.text();
-  let data: unknown;
+  console.log(`[Piston] RAW RUNTIMES RESPONSE:`, text);
 
+  if (!text || text.trim() === "") {
+    console.error(`[Piston] Empty response from runtimes API (HTTP ${res.status})`);
+    return []; // Return empty instead of crashing
+  }
+
+  let data: unknown;
   try {
     data = JSON.parse(text);
-  } catch {
-    throw new Error(
-      `Piston API Error:\nStatus: ${res.status}\nEndpoint: ${url}\nResponse: ${text.slice(0, 300)}`
-    );
+  } catch (err) {
+    console.error(`[Piston] Invalid JSON from runtimes API:`, text);
+    return []; // Return empty instead of crashing
   }
 
   if (!res.ok) {
@@ -468,13 +473,19 @@ export async function executePiston(
     }
 
     const text = await res.text();
-    let data: unknown;
+    console.log(`[Piston] RAW EXECUTION RESPONSE:`, text);
 
+    if (!text || text.trim() === "") {
+      throw new Error(`Empty response from Piston execution engine (HTTP ${res.status})`);
+    }
+
+    let data: any;
     try {
       data = JSON.parse(text);
-    } catch {
+    } catch (err) {
+      console.error(`[Piston] Invalid JSON from execution engine:`, text);
       throw new Error(
-        `Piston returned non-JSON response:\nStatus: ${res.status}\nEndpoint: ${url}\nPreview: ${text.slice(0, 300)}`
+        `Execution engine returned malformed response. Please try again.`
       );
     }
 
@@ -482,6 +493,11 @@ export async function executePiston(
       throw new Error(
         `Piston execute failed (HTTP ${res.status}) at ${url}: ${text.slice(0, 300)}`
       );
+    }
+
+    // Validate structure
+    if (!data || (!data.run && !data.compile)) {
+        throw new Error("Execution failed or invalid response structure from Piston");
     }
 
     return data as PistonExecuteResponse;
