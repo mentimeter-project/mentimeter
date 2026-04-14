@@ -14,6 +14,8 @@ interface TestCase {
 interface Question {
   question_text: string;
   question_type: 'text' | 'code';
+  code_mode: 'stdin' | 'function';
+  function_name: string;
   max_marks: number;
   test_cases: TestCase[];
 }
@@ -22,6 +24,8 @@ const emptyTestCase = (): TestCase => ({ input: '', expected_output: '', marks: 
 const emptyQ = (): Question => ({
   question_text: '',
   question_type: 'text',
+  code_mode: 'stdin',
+  function_name: '',
   max_marks: 10,
   test_cases: [],
 });
@@ -42,7 +46,12 @@ export default function CreateAssessmentPage() {
 
   const setQType = (i: number, type: 'text' | 'code') =>
     setQuestions(prev => prev.map((q, idx) =>
-      idx === i ? { ...q, question_type: type, test_cases: type === 'code' && q.test_cases.length === 0 ? [emptyTestCase()] : q.test_cases } : q
+      idx === i ? { ...q, question_type: type, code_mode: type === 'code' ? q.code_mode : 'stdin', function_name: type === 'code' ? q.function_name : '', test_cases: type === 'code' && q.test_cases.length === 0 ? [emptyTestCase()] : q.test_cases } : q
+    ));
+
+  const setCodeMode = (i: number, mode: 'stdin' | 'function') =>
+    setQuestions(prev => prev.map((q, idx) =>
+      idx === i ? { ...q, code_mode: mode, function_name: mode === 'function' ? q.function_name : '' } : q
     ));
 
   const addTestCase = (qIdx: number) =>
@@ -67,10 +76,38 @@ export default function CreateAssessmentPage() {
   const handleSubmit = async () => {
     if (!title.trim()) { setError('Title is required'); return; }
     if (questions.some(q => !q.question_text.trim())) { setError('All questions must have text'); return; }
-    // Validate coding questions have at least one test case with expected output
+
+    // Validate + sanitise function names for coding questions
     for (let i = 0; i < questions.length; i++) {
       const q = questions[i];
       if (q.question_type === 'code') {
+        if (q.code_mode === 'function') {
+          if (!q.function_name.trim()) {
+            setError(`Question ${i + 1} is function-based but has no function name`); return;
+          }
+
+          // Auto-sanitise: strip "def " / "function " prefix and call syntax
+          let fn = q.function_name.trim();
+          fn = fn.replace(/^(def|function)\s+/, '');
+          fn = fn.replace(/\s*\(.*$/, '').trim();
+
+          // Validate it's a proper identifier
+          const VALID_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
+          if (!VALID_IDENTIFIER.test(fn)) {
+            setError(
+              `Question ${i + 1}: "${fn}" is not a valid function name. ` +
+              `Use a plain name like "twoSum" or "group_anagrams" — no parentheses, spaces, or type hints.`
+            );
+            return;
+          }
+
+          // Update the state with the sanitised name (remove extra syntax silently)
+          if (fn !== q.function_name.trim()) {
+            setQuestions(prev => prev.map((qq, idx) =>
+              idx === i ? { ...qq, function_name: fn } : qq
+            ));
+          }
+        }
         if (q.test_cases.length === 0) {
           setError(`Question ${i + 1} is a coding question but has no test cases`); return;
         }
@@ -189,6 +226,56 @@ export default function CreateAssessmentPage() {
               </div>
             </div>
 
+            {/* Code Mode + Function Name (coding questions only) */}
+            {q.question_type === 'code' && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-slate-500 dark:text-slate-400 font-medium">Code Mode:</span>
+                  <div className="flex rounded-xl border border-slate-200 dark:border-slate-600 overflow-hidden">
+                    <button
+                      onClick={() => setCodeMode(i, 'stdin')}
+                      className={`px-4 py-1.5 text-xs font-semibold transition-all ${
+                        q.code_mode === 'stdin'
+                          ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white'
+                          : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
+                      }`}
+                    >
+                      📦 Full Program (stdin)
+                    </button>
+                    <button
+                      onClick={() => setCodeMode(i, 'function')}
+                      className={`px-4 py-1.5 text-xs font-semibold transition-all border-l border-slate-200 dark:border-slate-600 ${
+                        q.code_mode === 'function'
+                          ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white'
+                          : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
+                      }`}
+                    >
+                      ⚡ Function-Based
+                    </button>
+                  </div>
+                </div>
+
+                {q.code_mode === 'function' && (
+                  <div className="flex items-center gap-3">
+                    <label className="text-sm text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap">Function Name:</label>
+                    <input
+                      type="text"
+                      value={q.function_name}
+                      onChange={e => updateQ(i, 'function_name', e.target.value)}
+                      placeholder="e.g. twoSum  (bare name only, no parentheses)"
+                      className={`${inputClass} max-w-xs font-mono`}
+                    />
+                  </div>
+                )}
+
+                {q.code_mode === 'function' && (
+                  <p className="text-xs text-indigo-500 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-700/30 rounded-lg px-3 py-2">
+                    💡 <strong>Function mode:</strong> Students only write the function body. Test case input should be a JSON array of arguments, e.g. <code className="bg-indigo-100 dark:bg-indigo-800/40 px-1 rounded">[[1,2,3], 9]</code> for <code className="bg-indigo-100 dark:bg-indigo-800/40 px-1 rounded">{q.function_name || 'fn'}(nums, target)</code>.
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Test Cases (coding questions only) */}
             {q.question_type === 'code' && (
               <div className="bg-slate-900 dark:bg-slate-950 rounded-xl p-4 space-y-3">
@@ -229,7 +316,7 @@ export default function CreateAssessmentPage() {
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="text-slate-500 text-xs block mb-1">stdin (input)</label>
+                        <label className="text-slate-500 text-xs block mb-1">{q.code_mode === 'function' ? 'Input (JSON args)' : 'stdin (input)'}</label>
                         <textarea
                           value={tc.input}
                           onChange={e => updateTestCase(i, ti, 'input', e.target.value)}
@@ -239,7 +326,7 @@ export default function CreateAssessmentPage() {
                         />
                       </div>
                       <div>
-                        <label className="text-slate-500 text-xs block mb-1">stdout (expected output) *</label>
+                        <label className="text-slate-500 text-xs block mb-1">{q.code_mode === 'function' ? 'Expected output *' : 'stdout (expected output) *'}</label>
                         <textarea
                           value={tc.expected_output}
                           onChange={e => updateTestCase(i, ti, 'expected_output', e.target.value)}

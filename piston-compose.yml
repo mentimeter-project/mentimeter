@@ -1,0 +1,51 @@
+# Piston Code Execution Engine
+# Start:  docker compose -f piston-compose.yml up -d
+# Setup:  bash scripts/setup-piston.sh
+# Verify: curl http://localhost:2000/api/v2/runtimes
+
+version: '3.8'
+
+services:
+  piston:
+    image: ghcr.io/engineer-man/piston
+    container_name: piston
+    restart: unless-stopped
+    # Privileged mode is REQUIRED — Piston uses Linux namespaces (nsjail)
+    # to sandbox each code execution. Without it, isolate cannot create
+    # the cgroups and mount namespaces needed for secure execution.
+    privileged: true
+    ports:
+      - "127.0.0.1:2000:2000"
+    volumes:
+      # Persist installed language runtimes across container restarts
+      - piston-packages:/piston/packages
+    tmpfs:
+      # Ephemeral job workspace — auto-cleaned, size-capped, exec-enabled
+      - /piston/jobs:exec,size=256m
+    environment:
+      # ── Security ────────────────────────────────────────────────
+      # Disable network access inside sandboxed code executions.
+      # Piston's nsjail config blocks sockets by default; this is
+      # defence-in-depth via the environment.
+      PISTON_DISABLE_NETWORKING: "true"
+      # ── Resource limits (per execution) ─────────────────────────
+      # These are the DEFAULT limits applied to every /api/v2/execute
+      # call unless the request body overrides them.
+      PISTON_RUN_TIMEOUT: "10000"          # 10 s max run time
+      PISTON_COMPILE_TIMEOUT: "10000"      # 10 s max compile time
+      PISTON_RUN_MEMORY_LIMIT: "268435456"  # 256 MB
+      PISTON_COMPILE_MEMORY_LIMIT: "268435456"
+      PISTON_MAX_PROCESS_COUNT: "64"       # fork-bomb protection
+      PISTON_MAX_OPEN_FILES: "2048"
+      PISTON_OUTPUT_MAX_SIZE: "1048576"    # 1 MB max stdout+stderr
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+volumes:
+  piston-packages:

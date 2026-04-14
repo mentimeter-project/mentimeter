@@ -32,6 +32,7 @@ export interface EvalResult {
 interface EvalResultCardProps {
   result: EvalResult;
   isEvaluating?: boolean;   // show skeleton while waiting
+  evaluatingStatusText?: string;
   onDismiss?: () => void;
 }
 
@@ -57,20 +58,31 @@ function SkeletonLine({ w = 'w-full' }: { w?: string }) {
 }
 
 // ── Skeleton (shown while evaluating) ─────────────────────────────────────────
-export function EvalResultSkeleton() {
+export function EvalResultSkeleton({ statusText = 'Processing...' }: { statusText?: string }) {
   return (
     <div className="rounded-2xl border border-slate-700/60 bg-slate-900/80 overflow-hidden mt-4">
       {/* Header skeleton */}
-      <div className="px-5 pt-5 pb-4 border-b border-slate-700/50 flex items-center gap-4">
-        <div className="w-10 h-10 rounded-xl bg-slate-700/60 animate-pulse flex-shrink-0" />
-        <div className="flex-1 space-y-2">
-          <SkeletonLine w="w-36" />
-          <SkeletonLine w="w-24" />
-        </div>
-        <div className="flex gap-1.5">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="w-9 h-9 rounded-xl bg-slate-700/60 animate-pulse" />
-          ))}
+      <div className="px-5 pt-5 pb-4 border-b border-slate-700/50 flex flex-col gap-4">
+        {statusText && (
+          <div className="flex items-center gap-2 text-indigo-400 text-xs font-semibold">
+            <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+            </svg>
+            {statusText}
+          </div>
+        )}
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 rounded-xl bg-slate-700/60 animate-pulse flex-shrink-0" />
+          <div className="flex-1 space-y-2">
+            <SkeletonLine w="w-36" />
+            <SkeletonLine w="w-24" />
+          </div>
+          <div className="flex gap-1.5">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="w-9 h-9 rounded-xl bg-slate-700/60 animate-pulse" />
+            ))}
+          </div>
         </div>
       </div>
       {/* Terminal skeleton */}
@@ -94,10 +106,10 @@ export function EvalResultSkeleton() {
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
-export default function EvalResultCard({ result, isEvaluating, onDismiss }: EvalResultCardProps) {
-  if (isEvaluating) return <EvalResultSkeleton />;
+export default function EvalResultCard({ result, isEvaluating, evaluatingStatusText, onDismiss }: EvalResultCardProps) {
+  if (isEvaluating) return <EvalResultSkeleton statusText={evaluatingStatusText} />;
 
-  const { score, maxMarks, passed, total, compilationError, firstTestCaseDetails, testResults } = result;
+  const { score = 0, maxMarks = 0, passed = 0, total = 0, compilationError = null, firstTestCaseDetails, testResults = [] } = result || {};
   const allPassed   = passed === total && !compilationError;
   const nonePassed  = passed === 0 && !compilationError;
   const isPartial   = !allPassed && !nonePassed && !compilationError;

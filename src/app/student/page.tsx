@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { LANGUAGES, type Language } from '@/components/CodeEditor';
 import EvalResultCard, { EvalResultSkeleton } from '@/components/EvalResultCard';
+import { useSubmissionPoller } from '@/hooks/useSubmissionPoller';
 
 const CodeEditor = dynamic(() => import('@/components/CodeEditor'), { ssr: false });
 
@@ -34,8 +35,28 @@ export default function StudentPage() {
   const [savedAt, setSavedAt] = useState<Record<number, string>>({});
   // ── Code question state ──
   const [codeDrafts, setCodeDrafts] = useState<Record<number, { code: string; languageId: number }>>({});
+  const [questionTemplates, setQuestionTemplates] = useState<Record<number, Record<number, string>>>({});
   const [evaluating, setEvaluating] = useState<number | null>(null);
   const [evalResults, setEvalResults] = useState<Record<number, any>>({});
+  
+  const onPollComplete = useCallback((questionId: number, data: any) => {
+    setEvalResults(prev => ({ ...prev, [questionId]: data }));
+    if (!data.error) {
+      setAnsweredMap(prev => ({
+        ...prev,
+        [questionId]: { answer_text: codeDrafts[questionId]?.code, marks_awarded: data.score, reviewed: 1 }
+      }));
+      setSavedAt(prev => ({ ...prev, [questionId]: new Date().toLocaleTimeString() }));
+    }
+    setEvaluating(null);
+  }, [codeDrafts]);
+
+  const onPollError = useCallback((questionId: number, error: string) => {
+    setEvalResults(prev => ({ ...prev, [questionId]: { error } }));
+    setEvaluating(null);
+  }, []);
+
+  const { polls, startPolling } = useSubmissionPoller(onPollComplete, onPollError);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [currentUser, setCurrentUser] = useState('');
   const [name, setName] = useState('');
@@ -50,6 +71,13 @@ export default function StudentPage() {
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number | null>(null);
   const tabSwitchRef = useRef(0);
+
+  /** Get starter code for a question+language, preferring function-mode templates */
+  const getStarterCode = (questionId: number, languageId: number): string => {
+    const tmpl = questionTemplates[questionId];
+    if (tmpl?.[languageId]) return tmpl[languageId];
+    return LANGUAGES.find(l => l.id === languageId)?.boilerplate ?? '';
+  };
 
   useEffect(() => {
     setDark(document.documentElement.classList.contains('dark'));
@@ -70,6 +98,7 @@ export default function StudentPage() {
     setAssessment(data.assessment || null);
     setQuestions(data.questions || []);
     setAnsweredMap(data.answeredMap || {});
+    setQuestionTemplates(data.questionTemplates || {});
     if (data.assessment && startTimeRef.current === null) {
       startTimeRef.current = Date.now();
       setTimeLeft(((data.assessment.duration_minutes as number) || 30) * 60);
@@ -173,17 +202,25 @@ export default function StudentPage() {
       const data = await res.json();
       if (data.alreadySubmitted) {
         setEvalResults(prev => ({ ...prev, [questionId]: { error: 'You have already submitted this question.' } }));
+        setEvaluating(null);
         return;
       }
-      setEvalResults(prev => ({ ...prev, [questionId]: data }));
-      if (!data.error) {
-        setAnsweredMap(prev => ({ ...prev, [questionId]: { answer_text: draft.code, marks_awarded: data.score, reviewed: 1 } }));
-        setSavedAt(prev => ({ ...prev, [questionId]: new Date().toLocaleTimeString() }));
+      
+      if (data.status === 'queued' && data.logId) {
+        startPolling(questionId, data.logId);
+      } else if (data.error) {
+        setEvalResults(prev => ({ ...prev, [questionId]: { error: data.error } }));
+        setEvaluating(null);
+      } else {
+        setEvalResults(prev => ({ ...prev, [questionId]: data }));
+        if (!data.error) {
+          setAnsweredMap(prev => ({ ...prev, [questionId]: { answer_text: draft.code, marks_awarded: data.score, reviewed: 1 } }));
+          setSavedAt(prev => ({ ...prev, [questionId]: new Date().toLocaleTimeString() }));
+        }
+        setEvaluating(null);
       }
     } catch {
       setEvalResults(prev => ({ ...prev, [questionId]: { error: 'Network error. Please try again.' } }));
-    } finally {
-      setEvaluating(false as any);
       setEvaluating(null);
     }
   };
@@ -450,6 +487,9 @@ export default function StudentPage() {
                   const isReviewed = submitted?.reviewed;
                   const marksAwarded = submitted?.marks_awarded;
 
+                  const isEvaluatingQ = evaluating === qid || (polls[qid] && (polls[qid].status === 'queued' || polls[qid].status === 'running'));
+                  const evaluatingStatusText = polls[qid]?.status === 'queued' ? 'Queued...' : polls[qid]?.status === 'running' ? 'Running test cases...' : 'Processing submission...';
+
                   return (
                     <div className="p-8 max-w-3xl animate-fade-in">
                       {/* Question Header */}
@@ -493,7 +533,7 @@ export default function StudentPage() {
                           </div>
 
                           <CodeEditor
-                            value={codeDrafts[qid]?.code ?? (isSubmitted ? (submitted?.answer_text as string ?? '') : (LANGUAGES[0].boilerplate))}
+                            value={codeDrafts[qid]?.code ?? (isSubmitted ? (submitted?.answer_text as string ?? '') : getStarterCode(qid, codeDrafts[qid]?.languageId ?? LANGUAGES[0].id))}
                             languageId={codeDrafts[qid]?.languageId ?? LANGUAGES[0].id}
                             disabled={isSubmitted}
                             onChange={(code) =>
@@ -503,7 +543,7 @@ export default function StudentPage() {
                               setCodeDrafts(prev => ({
                                 ...prev,
                                 [qid]: {
-                                  code: prev[qid]?.code ?? lang.boilerplate,
+                                  code: getStarterCode(qid, lang.id),
                                   languageId: lang.id,
                                 },
                               }))
@@ -514,23 +554,23 @@ export default function StudentPage() {
                           {!isSubmitted && (
                             <div className="flex items-center justify-between pt-1">
                               <div className="text-xs text-slate-400 dark:text-slate-500">
-                                {evaluating === qid && (
+                                {isEvaluatingQ && (
                                   <span className="flex items-center gap-1.5 text-indigo-400">
                                     <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
                                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
                                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
                                     </svg>
-                                    Evaluating against test cases...
+                                    {evaluatingStatusText}
                                   </span>
                                 )}
                               </div>
                               <button
                                 id={`submit-code-${qid}`}
                                 onClick={() => evaluateCode(qid)}
-                                disabled={evaluating === qid || !codeDrafts[qid]?.code?.trim()}
+                                disabled={isEvaluatingQ || !codeDrafts[qid]?.code?.trim()}
                                 className="inline-flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 active:scale-95 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition-all shadow-lg shadow-indigo-500/25 disabled:opacity-40 disabled:cursor-not-allowed hover:scale-[1.02]"
                               >
-                                {evaluating === qid ? (
+                                {isEvaluatingQ ? (
                                   <><svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Running...</>
                                 ) : (
                                   <>▶ Run &amp; Submit</>
@@ -540,8 +580,8 @@ export default function StudentPage() {
                           )}
 
                           {/* Evaluation result card — show skeleton while evaluating, card once done */}
-                          {evaluating === qid ? (
-                            <EvalResultSkeleton />
+                          {isEvaluatingQ ? (
+                            <EvalResultSkeleton statusText={evaluatingStatusText} />
                           ) : evalResults[qid] ? (
                             evalResults[qid].error ? (
                               <div className="bg-red-950/40 border border-red-500/30 text-red-400 rounded-xl px-4 py-3 text-sm">

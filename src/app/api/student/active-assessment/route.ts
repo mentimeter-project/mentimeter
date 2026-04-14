@@ -15,11 +15,11 @@ export async function GET() {
   ).get() as Record<string, unknown> | undefined;
 
   if (!assessment) {
-    return NextResponse.json({ assessment: null, questions: [], answeredMap: {} });
+    return NextResponse.json({ assessment: null, questions: [], answeredMap: {}, questionTemplates: {} });
   }
 
   const questions = db.prepare(
-    'SELECT id, question_text, question_type, max_marks, order_index FROM questions WHERE assessment_id = ? ORDER BY order_index ASC'
+    'SELECT id, question_text, question_type, code_mode, function_name, max_marks, order_index FROM questions WHERE assessment_id = ? ORDER BY order_index ASC'
   ).all(assessment.id as number);
 
   const existingResponses = db.prepare(`
@@ -38,5 +38,19 @@ export async function GET() {
     };
   });
 
-  return NextResponse.json({ assessment, questions, answeredMap });
+  // Fetch starter code templates for function-mode questions
+  const templateRows = db.prepare(`
+    SELECT qt.question_id, qt.language_id, qt.starter_code
+    FROM question_templates qt
+    JOIN questions q ON qt.question_id = q.id
+    WHERE q.assessment_id = ? AND q.code_mode = 'function'
+  `).all(assessment.id as number) as { question_id: number; language_id: number; starter_code: string }[];
+
+  const questionTemplates: Record<number, Record<number, string>> = {};
+  for (const row of templateRows) {
+    if (!questionTemplates[row.question_id]) questionTemplates[row.question_id] = {};
+    questionTemplates[row.question_id][row.language_id] = row.starter_code;
+  }
+
+  return NextResponse.json({ assessment, questions, answeredMap, questionTemplates });
 }

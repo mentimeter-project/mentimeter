@@ -38,6 +38,8 @@ db.exec(`
     assessment_id INTEGER NOT NULL,
     question_text TEXT NOT NULL,
     question_type TEXT DEFAULT 'text',
+    code_mode TEXT DEFAULT 'stdin',
+    function_name TEXT DEFAULT NULL,
     max_marks INTEGER DEFAULT 10,
     order_index INTEGER DEFAULT 0,
     FOREIGN KEY (assessment_id) REFERENCES assessments(id) ON DELETE CASCADE
@@ -87,6 +89,33 @@ db.exec(`
     event_count INTEGER DEFAULT 1,
     logged_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
+
+  CREATE TABLE IF NOT EXISTS submission_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    student_id INTEGER NOT NULL,
+    question_id INTEGER NOT NULL,
+    language_id INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'running',
+    test_cases_total INTEGER DEFAULT 0,
+    test_cases_completed INTEGER DEFAULT 0,
+    execution_time_ms INTEGER DEFAULT NULL,
+    error_message TEXT DEFAULT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    started_at DATETIME DEFAULT NULL,
+    completed_at DATETIME DEFAULT NULL,
+    FOREIGN KEY (student_id) REFERENCES students(id),
+    FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS question_templates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    question_id INTEGER NOT NULL,
+    language_id INTEGER NOT NULL,
+    starter_code TEXT NOT NULL DEFAULT '',
+    driver_code TEXT NOT NULL DEFAULT '',
+    UNIQUE(question_id, language_id),
+    FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE
+  );
 `);
 
 // ── SCHEMA MIGRATIONS (idempotent ALTER TABLE) ──
@@ -94,6 +123,20 @@ const existingQCols = (db.pragma('table_info(questions)') as { name: string }[])
 if (!existingQCols.includes('question_type')) {
   db.exec(`ALTER TABLE questions ADD COLUMN question_type TEXT DEFAULT 'text'`);
   console.log('✅ Migration: added question_type to questions');
+}
+if (!existingQCols.includes('function_name')) {
+  db.exec(`ALTER TABLE questions ADD COLUMN function_name TEXT DEFAULT NULL`);
+  console.log('✅ Migration: added function_name to questions');
+}
+if (!existingQCols.includes('code_mode')) {
+  db.exec(`ALTER TABLE questions ADD COLUMN code_mode TEXT DEFAULT 'stdin'`);
+  console.log('✅ Migration: added code_mode to questions');
+}
+
+const existingLogCols = (db.pragma('table_info(submission_logs)') as { name: string }[]).map(c => c.name);
+if (!existingLogCols.includes('result_payload')) {
+  db.exec(`ALTER TABLE submission_logs ADD COLUMN result_payload TEXT DEFAULT NULL`);
+  console.log('✅ Migration: added result_payload to submission_logs');
 }
 
 // Enable foreign keys for CASCADE deletes
