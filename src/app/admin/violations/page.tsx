@@ -39,7 +39,7 @@ export default function ViolationsPage() {
           🚨 Live Monitor <span className="text-red-500 ml-2 animate-pulse">●</span>
         </h1>
         <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-          Auto-refresh active
+          Auto-refresh On
         </span>
       </div>
 

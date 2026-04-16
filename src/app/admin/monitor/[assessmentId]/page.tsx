@@ -42,10 +42,10 @@ export default function MonitorPage() {
         <div className="flex items-center gap-4">
           <div className="w-10 h-10 bg-indigo-500/10 rounded-2xl flex items-center justify-center text-xl shadow-lg shadow-indigo-500/10 border border-indigo-500/20">👁️</div>
           <div>
-            <span className="font-black text-foreground text-lg tracking-tight">Deployment Stream</span>
+            <span className="font-black text-foreground text-lg tracking-tight">Live Monitor</span>
             <div className="flex items-center gap-2 mt-0.5">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-emerald-500 text-[10px] font-black uppercase tracking-widest">Real-time Telemetry Active</span>
+              <span className="text-emerald-500 text-[10px] font-black uppercase tracking-widest">Live Updates On</span>
             </div>
           </div>
         </div>
@@ -56,9 +56,9 @@ export default function MonitorPage() {
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
           {[
-            { label: 'Total Syncs', value: students.length, color: 'text-foreground', icon: '👥', accent: 'bg-indigo-500/5' },
-            { label: 'Progress Active', value: activeCount, color: 'text-emerald-600 dark:text-emerald-400', icon: '✅', accent: 'bg-emerald-500/5' },
-            { label: 'Integrity Alerts', value: suspiciousCount, color: 'text-red-600 dark:text-red-400', icon: '⚠️', accent: 'bg-red-500/5' },
+            { label: 'Total Students', value: students.length, color: 'text-foreground', icon: '👥', accent: 'bg-indigo-500/5' },
+            { label: 'Active Now', value: activeCount, color: 'text-emerald-600 dark:text-emerald-400', icon: '✅', accent: 'bg-emerald-500/5' },
+            { label: 'Warnings', value: suspiciousCount, color: 'text-red-600 dark:text-red-400', icon: '⚠️', accent: 'bg-red-500/5' },
           ].map((s, idx) => (
             <motion.div key={s.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.1 }} className="glass-premium p-8 rounded-[2rem] border border-gray-100 dark:border-white/5 shadow-sm text-center relative overflow-hidden group">
                <div className={`absolute top-0 right-0 w-24 h-24 ${s.accent} blur-3xl rounded-full translate-x-12 -translate-y-12`} />
@@ -86,7 +86,7 @@ export default function MonitorPage() {
         {loading && (
            <div className="flex flex-col items-center justify-center py-20 animate-pulse">
               <div className="w-12 h-12 border-4 border-indigo-500/10 border-t-indigo-500 rounded-full animate-spin mb-4" />
-              <p className="text-muted-foreground text-[10px] font-black uppercase tracking-widest leading-none">Accessing Registry Stream...</p>
+              <p className="text-muted-foreground text-[10px] font-black uppercase tracking-widest leading-none">Loading Students...</p>
            </div>
         )}
 
@@ -106,14 +106,14 @@ export default function MonitorPage() {
                     </div>
                     {hasSwitched && (
                       <span className="bg-red-500/10 text-red-500 border border-red-500/20 text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-xl shadow-inner animate-pulse">
-                        Alert {s.tab_switches}x
+                        Warning {s.tab_switches}x
                       </span>
                     )}
                   </div>
                   {/* Progress */}
                   <div className="mt-8">
                     <div className="flex justify-between text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-3 opacity-60 italic">
-                      <span>Saturation</span>
+                      <span>Progress</span>
                       <span className="text-foreground">{s.answered}/{s.total_questions} Solved</span>
                     </div>
                     <div className="h-2.5 bg-gray-100 dark:bg-black/40 rounded-full overflow-hidden p-0.5 border border-gray-200 dark:border-white/10 shadow-inner">

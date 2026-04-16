@@ -112,12 +112,12 @@ export default function CodeEditor({
             <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
           </div>
-          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-600 dark:text-slate-400">Source Editor</span>
+          <span className="text-xs font-black uppercase tracking-[0.2em] opacity-80 mt-0.5">Code Editor</span>
         </div>
 
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2.5">
-            <span className="text-slate-600 dark:text-slate-400 text-[10px] font-black uppercase tracking-widest">Lang:</span>
+            <span className="text-slate-600 dark:text-slate-400 text-[10px] font-black uppercase tracking-widest">Language:</span>
             <select
               value={selectedLang.id}
               onChange={(e) => {

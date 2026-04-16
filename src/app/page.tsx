@@ -136,7 +136,7 @@ export default function LoginPage() {
               />
             </div>
             <div className="space-y-2">
-              <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] ml-1 opacity-70">Secure Password</label>
+              <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] ml-1 opacity-70">Password</label>
               <input
                 type="password" value={password} onChange={e => setPassword(e.target.value)} required
                 placeholder={role === 'admin' ? '••••••••' : 'Your Student ID / USN'}
@@ -166,25 +166,25 @@ export default function LoginPage() {
             >
               {loading ? (
                 <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-              ) : `Access Portal as ${role}`}
+              ) : `Log in as ${role}`}
             </motion.button>
-            <p className="text-center text-[9px] text-muted-foreground/50 font-black uppercase tracking-[0.25em] pt-2">Protected by Adaptive Security Layer</p>
+            <p className="text-center text-[9px] text-muted-foreground/50 font-black uppercase tracking-[0.25em] pt-2">Secure Login</p>
           </form>
 
           {/* Quick Help */}
           <div className="mt-8 pt-6 border-t border-gray-200 dark:border-white/5 relative z-10">
             <div className="flex items-center justify-between mb-5">
-              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-50">Session Nodes</span>
-              <span className="text-[10px] font-black uppercase tracking-widest text-indigo-500/80">v4.2.0-STABLE</span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-50">Version</span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-indigo-500/80">4.2.0</span>
             </div>
             <div className="grid grid-cols-2 gap-6">
               <div className="space-y-1.5">
-                <span className="text-[9px] font-black uppercase tracking-widest text-indigo-500 opacity-80 block">Access Strategy</span>
-                <span className="text-[10px] font-bold text-muted-foreground leading-snug block opacity-70">Use internal LDAP or USN credentials.</span>
+                <span className="text-[9px] font-black uppercase tracking-widest text-indigo-500 opacity-80 block">Login Info</span>
+                <span className="text-[10px] font-bold text-muted-foreground leading-snug block opacity-70">Use your student ID or admin username.</span>
               </div>
               <div className="space-y-1.5">
-                <span className="text-[9px] font-black uppercase tracking-widest text-purple-500 opacity-80 block">Sentinel Guard</span>
-                <span className="text-[10px] font-bold text-muted-foreground leading-snug block opacity-70">Active monitoring for tab-switching active.</span>
+                <span className="text-[9px] font-black uppercase tracking-widest text-purple-500 opacity-80 block">Monitoring</span>
+                <span className="text-[10px] font-bold text-muted-foreground leading-snug block opacity-70">Tab switching is recorded.</span>
               </div>
             </div>
           </div>

@@ -128,17 +128,17 @@ export default function CreateAssessmentPage() {
           <motion.div whileHover={{ rotate: 10 }} className="w-8 h-8 premium-gradient rounded-lg flex items-center justify-center shadow-md shadow-indigo-500/20">
             <span className="text-white font-black text-sm">M</span>
           </motion.div>
-          <span className="font-black text-foreground text-base tracking-tight italic">Construct Assessment</span>
+          <span className="font-black text-foreground text-base tracking-tight italic">Create Assessment</span>
         </div>
         <Link href="/admin">
-          <motion.button whileHover={{ x: -2 }} className="text-muted-foreground hover:text-foreground text-[10px] font-black uppercase tracking-widest transition-colors">← Back Registry</motion.button>
+          <motion.button whileHover={{ x: -2 }} className="text-muted-foreground hover:text-foreground text-[10px] font-black uppercase tracking-widest transition-colors">← Back to Dashboard</motion.button>
         </Link>
       </nav>
 
       <div className="max-w-3xl mx-auto p-12 space-y-6">
         <header className="mb-4">
-           <h2 className="text-4xl font-black text-foreground italic tracking-tight mb-2">Initialize New</h2>
-           <p className="text-muted-foreground font-medium uppercase tracking-[0.2em] text-[10px]">Define assessment protocols and validation cluster.</p>
+           <h2 className="text-4xl font-black text-foreground italic tracking-tight mb-2">New Assessment</h2>
+           <p className="text-muted-foreground font-medium uppercase tracking-[0.2em] text-[10px]">Set up your test details.</p>
         </header>
 
         {/* Assessment Details */}
@@ -151,7 +151,7 @@ export default function CreateAssessmentPage() {
             />
           </div>
           <div>
-            <label className={labelClass}>Overview</label>
+            <label className={labelClass}>Description</label>
             <textarea
               placeholder="Technical description of assessment goals..." value={description} onChange={e => setDescription(e.target.value)} rows={2}
               className={`${inputClass} resize-none`}
@@ -165,7 +165,7 @@ export default function CreateAssessmentPage() {
                  className="w-24 bg-white dark:bg-slate-900 border border-gray-200 dark:border-white/5 rounded-xl px-4 py-2 text-foreground font-black text-xs focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none"
                />
             </div>
-            <p className="text-[9px] font-black uppercase tracking-widest text-indigo-500/60 leading-tight">Ensure sufficient runtime for complex logic units.</p>
+            <p className="text-[9px] font-black uppercase tracking-widest text-indigo-500/60 leading-tight">Give students enough time to finish.</p>
           </div>
         </section>
 
@@ -179,20 +179,20 @@ export default function CreateAssessmentPage() {
               >
                 {/* Question header */}
                 <div className="flex justify-between items-center">
-                  <span className="text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase tracking-[0.3em]">Module Cluster {String(i + 1).padStart(2, '0')}</span>
+                  <span className="text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase tracking-[0.3em]">Question {String(i + 1).padStart(2, '0')}</span>
                   {questions.length > 1 && (
                     <motion.button whileTap={{ scale: 0.9 }} onClick={() => setQuestions(p => p.filter((_, idx) => idx !== i))}
                       className="text-red-500 hover:text-red-400 text-xs font-black uppercase tracking-widest transition-colors flex items-center gap-1.5 group-hover:opacity-100 opacity-60">
-                      Wipe Module 🗑️
+                      Delete Question 🗑️
                     </motion.button>
                   )}
                 </div>
 
                 {/* Question text */}
                 <div>
-                   <label className={labelClass}>Technical Requirements</label>
+                   <label className={labelClass}>Question Text</label>
                    <textarea
-                    placeholder="Enter logic task description..." value={q.question_text}
+                    placeholder="Enter question description..." value={q.question_text}
                     onChange={e => updateQ(i, 'question_text', e.target.value)} rows={3}
                     className={`${inputClass} resize-none py-4 leading-relaxed font-medium`}
                   />
@@ -201,7 +201,7 @@ export default function CreateAssessmentPage() {
                 {/* Type selector + max marks */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className={labelClass}>Interface Mode</label>
+                    <label className={labelClass}>Answer Type</label>
                     <div className="flex p-1 bg-gray-100 dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-white/5">
                       <button
                         onClick={() => setQType(i, 'text')}
@@ -211,7 +211,7 @@ export default function CreateAssessmentPage() {
                             : 'text-muted-foreground'
                         }`}
                       >
-                        📝 Discourse
+                        📝 Text
                       </button>
                       <button
                         onClick={() => setQType(i, 'code')}
@@ -221,13 +221,13 @@ export default function CreateAssessmentPage() {
                             : 'text-muted-foreground'
                         }`}
                       >
-                        💻 Syntax
+                        💻 Code
                       </button>
                     </div>
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    <label className={labelClass}>Weightage (PTS)</label>
+                    <label className={labelClass}>Points</label>
                     <input
                       type="number" value={q.max_marks}
                       onChange={e => updateQ(i, 'max_marks', parseInt(e.target.value) || 10)} min={1} max={100}
@@ -240,7 +240,7 @@ export default function CreateAssessmentPage() {
                 {q.question_type === 'code' && (
                   <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="space-y-6 pt-6 border-t border-gray-100 dark:border-white/5">
                     <div className="space-y-4">
-                      <label className={labelClass}>Execution Environment</label>
+                      <label className={labelClass}>Code Environment</label>
                       <div className="flex p-1 bg-gray-100 dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-white/5">
                         <button
                           onClick={() => setCodeMode(i, 'stdin')}
@@ -250,7 +250,7 @@ export default function CreateAssessmentPage() {
                               : 'text-muted-foreground'
                           }`}
                         >
-                          📦 Standard I/O
+                          📦 Standard Input/Output
                         </button>
                         <button
                           onClick={() => setCodeMode(i, 'function')}
@@ -260,17 +260,17 @@ export default function CreateAssessmentPage() {
                               : 'text-muted-foreground'
                           }`}
                         >
-                          ⚡ Logic Unit
+                          ⚡ Function
                         </button>
                       </div>
                     </div>
 
                     {q.code_mode === 'function' && (
                       <div className="space-y-2">
-                        <label className={labelClass}>Unit Identifier (Function Name)</label>
+                        <label className={labelClass}>Function Name</label>
                         <input
                           type="text" value={q.function_name} onChange={e => updateQ(i, 'function_name', e.target.value)}
-                          placeholder="e.g. solve_logic_v1"
+                          placeholder="e.g. solve"
                           className={`${inputClass} font-mono`}
                         />
                       </div>
@@ -279,18 +279,18 @@ export default function CreateAssessmentPage() {
                     {/* Test Cases */}
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
-                         <label className={labelClass}>Validation Probes (Hidden)</label>
-                         <span className="text-[10px] font-medium text-muted-foreground opacity-50 px-2 py-0.5 rounded-lg border border-gray-200 dark:border-white/5">{q.test_cases.length} active</span>
+                         <label className={labelClass}>Hidden Test Cases</label>
+                         <span className="text-[10px] font-medium text-muted-foreground opacity-50 px-2 py-0.5 rounded-lg border border-gray-200 dark:border-white/5">{q.test_cases.length} test cases</span>
                       </div>
 
                       <div className="space-y-3">
                         {q.test_cases.map((tc, ti) => (
                           <div key={ti} className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-white/5 rounded-2xl p-6 space-y-4 relative shadow-inner group/probe">
                             <div className="flex items-center justify-between">
-                              <span className="text-indigo-500 text-[10px] font-black uppercase tracking-widest">Probe {ti + 1}</span>
+                              <span className="text-indigo-500 text-[10px] font-black uppercase tracking-widest">Test Case {ti + 1}</span>
                               <div className="flex items-center gap-4">
                                 <div className="flex items-center gap-2">
-                                  <label className="text-[9px] font-black text-muted-foreground uppercase">Yield</label>
+                                  <label className="text-[9px] font-black text-muted-foreground uppercase">Points</label>
                                   <input
                                     type="number" value={tc.marks} min={1} max={50}
                                     onChange={e => updateTestCase(i, ti, 'marks', parseInt(e.target.value) || 1)}
@@ -307,7 +307,7 @@ export default function CreateAssessmentPage() {
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               <div className="space-y-2">
-                                <label className="text-[9px] font-black uppercase tracking-widest opacity-40">Input Signal</label>
+                                <label className="text-[9px] font-black uppercase tracking-widest opacity-40">Input</label>
                                 <textarea
                                   value={tc.input} onChange={e => updateTestCase(i, ti, 'input', e.target.value)} rows={2}
                                   placeholder="(Blank if default)"
@@ -315,10 +315,10 @@ export default function CreateAssessmentPage() {
                                 />
                               </div>
                               <div className="space-y-2">
-                                <label className="text-[9px] font-black uppercase tracking-widest opacity-40">Target Artifact</label>
+                                <label className="text-[9px] font-black uppercase tracking-widest opacity-40">Expected Output</label>
                                 <textarea
                                   value={tc.expected_output} onChange={e => updateTestCase(i, ti, 'expected_output', e.target.value)} rows={2}
-                                  placeholder="Expected return signal..."
+                                  placeholder="Expected output..."
                                   className="w-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-white/5 rounded-xl px-4 py-3 text-xs font-mono text-foreground focus:ring-1 focus:ring-indigo-500 outline-none resize-none shadow-sm"
                                 />
                               </div>
@@ -329,7 +329,7 @@ export default function CreateAssessmentPage() {
 
                       <motion.button whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }} onClick={() => addTestCase(i)}
                         className="w-full border-2 border-dashed border-gray-200 dark:border-white/10 hover:border-indigo-500/50 hover:bg-indigo-500/5 text-muted-foreground hover:text-indigo-500 rounded-2xl py-4 text-[10px] font-black uppercase tracking-widest transition-all">
-                        + Append Logic Probe
+                        + Add Test Case
                       </motion.button>
                     </div>
                   </motion.div>
@@ -346,18 +346,18 @@ export default function CreateAssessmentPage() {
              className="w-full p-8 rounded-[2rem] border-2 border-dashed border-gray-200 dark:border-white/10 hover:border-indigo-500/50 transition-all flex flex-col items-center justify-center gap-3 group"
            >
               <span className="text-2xl group-hover:scale-125 transition-transform duration-300">🏢</span>
-              <span className="text-[11px] font-black uppercase tracking-[0.4em] text-muted-foreground group-hover:text-indigo-500">Append Logic Cluster to Queue</span>
+              <span className="text-[11px] font-black uppercase tracking-[0.4em] text-muted-foreground group-hover:text-indigo-500">Add Question</span>
            </motion.button>
 
            {error && (
              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-red-500/5 border border-red-500/20 text-red-500 text-[10px] font-black px-8 py-5 rounded-2xl uppercase tracking-widest shadow-2xl">
-                ⚠️ Protocol Error: {error}
+                ⚠️ Error: {error}
              </motion.div>
            )}
 
            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={handleSubmit} disabled={submitting}
              className="w-full premium-gradient text-white font-black py-6 rounded-[2rem] transition-all shadow-2xl shadow-indigo-500/30 disabled:opacity-50 uppercase tracking-[0.3em] text-[12px] flex items-center justify-center gap-4">
-             {submitting ? 'Finalizing...' : 'Finalize & Deploy Protocol 🛰️'}
+             {submitting ? 'Creating...' : 'Create Assessment 🚀'}
            </motion.button>
         </div>
       </div>

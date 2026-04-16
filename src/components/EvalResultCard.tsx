@@ -164,7 +164,7 @@ export default function EvalResultCard({ result, userName, isEvaluating, evaluat
             <span className="w-3 h-3 rounded-full bg-emerald-400 dark:bg-green-500/40" />
           </div>
           <span className="text-slate-600 dark:text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] ml-2 flex items-center gap-2">
-            System Log — Test Case 1 {tc1 && <span className={`px-2 py-0.5 rounded-md ${tc1.status === 'Pass' ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' : 'bg-red-500/20 text-red-600 dark:text-red-400'}`}>{tc1.executionStatus}</span>}
+            Test Results {tc1 && <span className={`px-2 py-0.5 rounded-md ${tc1.status === 'Pass' ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' : 'bg-red-500/20 text-red-600 dark:text-red-400'}`}>{tc1.executionStatus}</span>}
           </span>
           <div className="w-12" />
         </div>
@@ -172,7 +172,7 @@ export default function EvalResultCard({ result, userName, isEvaluating, evaluat
         <div className="px-8 py-8 space-y-4">
           {hasCompErr && (
             <div className="space-y-3">
-              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-red-500 block">Compiler Error Log</span>
+              <h3 className="text-sm font-black uppercase tracking-[0.2em] opacity-80">Error</h3>
               <pre className="text-red-400/90 text-xs leading-relaxed whitespace-pre-wrap break-all bg-red-500/5 p-4 rounded-2xl border border-red-500/10 max-h-60 overflow-y-auto custom-scrollbar">
                 {compilationError}
               </pre>
@@ -202,7 +202,7 @@ export default function EvalResultCard({ result, userName, isEvaluating, evaluat
 
           {!hasCompErr && tc1?.status === 'Pass' && (
             <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-3 mt-4 text-emerald-500 text-[10px] font-black uppercase tracking-widest bg-emerald-500/5 p-4 rounded-2xl border border-emerald-500/10">
-              <span className="text-lg">✨</span> Verification logic matched expected outputs.
+              <span className="text-lg">✨</span> All test cases passed.
             </motion.div>
           )}
         </div>

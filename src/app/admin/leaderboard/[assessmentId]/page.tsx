@@ -27,10 +27,10 @@ export default function AdminLeaderboardPage() {
         <div className="flex items-center gap-4">
           <div className="w-10 h-10 bg-amber-500/10 rounded-2xl flex items-center justify-center text-xl shadow-lg shadow-amber-500/10 border border-amber-500/20">🏆</div>
           <div>
-            <span className="font-black text-foreground text-lg tracking-tight">Arena Standings</span>
+            <span className="font-black text-foreground text-lg tracking-tight">Leaderboard</span>
             <div className="flex items-center gap-2 mt-0.5">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-emerald-500 text-[10px] font-black uppercase tracking-widest">Live Updates active</span>
+              <span className="text-emerald-500 text-[10px] font-black uppercase tracking-widest">Live Updates On</span>
             </div>
           </div>
         </div>
@@ -41,7 +41,7 @@ export default function AdminLeaderboardPage() {
         {loading && (
           <div className="flex flex-col items-center justify-center py-20 animate-pulse">
             <div className="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mb-4" />
-            <p className="text-muted-foreground text-[10px] font-black uppercase tracking-widest leading-none">Accessing Score Modules...</p>
+            <p className="text-muted-foreground text-[10px] font-black uppercase tracking-widest leading-none">Loading Scores...</p>
           </div>
         )}
 
@@ -54,8 +54,8 @@ export default function AdminLeaderboardPage() {
 
         {!loading && leaderboard.length > 0 && (
           <div className="flex items-center justify-between mb-8 px-4">
-            <p className="text-muted-foreground text-[10px] font-black uppercase tracking-widest italic">{leaderboard.length} Combatants Engaged</p>
-            <p className="text-muted-foreground text-[10px] font-black uppercase tracking-widest italic">Points System v2.1</p>
+            <p className="text-muted-foreground text-[10px] font-black uppercase tracking-widest italic">{leaderboard.length} Students Submitted</p>
+            <p className="text-muted-foreground text-[10px] font-black uppercase tracking-widest italic">Scoring System</p>
           </div>
         )}
 
@@ -83,7 +83,7 @@ export default function AdminLeaderboardPage() {
             </div>
             <div className="text-right relative">
               <p className={`text-4xl font-black tabular-nums tracking-tighter ${i === 0 ? 'text-amber-500' : i === 1 ? 'text-gray-400' : i === 2 ? 'text-orange-500' : 'text-indigo-500'}`}>{s.score || 0}</p>
-              <p className="text-muted-foreground text-[9px] font-black uppercase tracking-[0.3em] opacity-40 italic">Total Marks</p>
+              <p className="text-muted-foreground text-[9px] font-black uppercase tracking-[0.3em] opacity-40 italic">Total Points</p>
             </div>
           </div>
         ))}

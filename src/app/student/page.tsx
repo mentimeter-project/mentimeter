@@ -306,16 +306,16 @@ export default function StudentPage() {
       <div className="h-screen flex items-center justify-center animate-fade-in relative overflow-hidden">
         <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="glass-premium p-12 text-center max-w-md relative z-10 rounded-[3rem] shadow-2xl">
           <motion.div initial={{ y: 20 }} animate={{ y: 0 }} transition={{ type: "spring", stiffness: 200, damping: 20 }} className="text-7xl mb-8">🎉</motion.div>
-          <h2 className="text-4xl font-black tracking-tight mb-3 text-foreground italic">Mission Complete!</h2>
-          <p className="text-muted-foreground text-sm mb-8 font-medium leading-relaxed uppercase tracking-widest opacity-80">Your cognitive payload has been encrypted and stored safely. Great effort today, {firstName}!</p>
+          <h2 className="text-4xl font-black tracking-tight mb-3 text-foreground italic">All Done!</h2>
+          <p className="text-muted-foreground text-sm mb-8 font-medium leading-relaxed uppercase tracking-widest opacity-80">Your answers have been saved. Great effort today, {firstName}!</p>
           {myRank > 0 && (
             <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-[2rem] p-6 mb-10 shadow-inner">
-              <p className="text-indigo-600 dark:text-indigo-400 font-black text-xl mb-1 tracking-tight">Position: #{myRank}</p>
-              <p className="text-muted-foreground text-[10px] font-black uppercase tracking-widest">{myScore} XP Accumulated</p>
+              <p className="text-indigo-600 dark:text-indigo-400 font-black text-xl mb-1 tracking-tight">Rank: #{myRank}</p>
+              <p className="text-muted-foreground text-[10px] font-black uppercase tracking-widest">{myScore} Points Earned</p>
             </div>
           )}
           <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={logout} className="premium-gradient text-white font-black px-12 py-5 rounded-2xl shadow-xl shadow-indigo-500/30 uppercase tracking-[0.25em] text-[11px]">
-            Finalize Disconnect
+            Log Out
           </motion.button>
         </motion.div>
       </div>
@@ -330,11 +330,11 @@ export default function StudentPage() {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-md z-[100] flex items-center justify-center p-6">
             <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} className="glass-premium p-10 max-w-sm w-full rounded-[2.5rem] shadow-2xl">
               <div className="w-16 h-16 bg-amber-500/10 rounded-2xl flex items-center justify-center text-3xl mb-6 shadow-lg shadow-amber-500/10 border border-amber-500/20">🛰️</div>
-              <h3 className="text-2xl font-black mb-3 leading-none text-foreground">Finalize Transmission?</h3>
+              <h3 className="text-2xl font-black mb-3 leading-none text-foreground">Submit Assignment?</h3>
               <p className="text-muted-foreground text-sm mb-8 font-medium leading-relaxed">You've successfully solved <span className="text-indigo-600 dark:text-indigo-400 font-black">{answeredCount}</span> out of <span className="text-foreground font-black">{questions.length}</span> problems. Confirm final submission to log results.</p>
               <div className="flex flex-col gap-3">
                 <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => handleSubmitAll(true)} className="w-full premium-gradient text-white font-black py-4 rounded-2xl shadow-xl shadow-indigo-500/20 uppercase tracking-widest text-[11px]">Confirm & Submit</motion.button>
-                <button onClick={() => setShowSubmitConfirm(false)} className="w-full px-4 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors">Return to Exam</button>
+                <button onClick={() => setShowSubmitConfirm(false)} className="w-full px-4 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors">Back to Exam</button>
               </div>
             </motion.div>
           </motion.div>
@@ -364,19 +364,19 @@ export default function StudentPage() {
               isWarning ? 'bg-amber-500/10 text-amber-500 border-amber-500' :
               'bg-indigo-500/5 text-indigo-600 dark:text-indigo-400 border-indigo-500/20 shadow-sm'
             }`}>
-              <span className="opacity-60 font-black">EXPIRES IN</span>
+              <span className="opacity-60 font-black">TIME LEFT</span>
               <span className="text-base tabular-nums">{formatTime(timeLeft)}</span>
             </div>
           )}
 
           <div className="hidden xl:flex flex-col items-end gap-2">
             <div className="flex items-center gap-4">
-              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Status {answeredCount}/{questions.length}</span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Done: {answeredCount}/{questions.length}</span>
               <div className="w-40 h-2 bg-gray-200 dark:bg-white/5 rounded-full overflow-hidden p-0.5 border border-gray-200 dark:border-white/5">
                 <motion.div initial={{ width: 0 }} animate={{ width: `${questions.length ? (answeredCount / questions.length) * 100 : 0}%` }} className="h-full premium-gradient rounded-full" />
               </div>
             </div>
-            {myRank > 0 && <span className="text-[10px] font-black tracking-widest uppercase text-indigo-500">Live Ranking #{myRank}</span>}
+            {myRank > 0 && <span className="text-[10px] font-black tracking-widest uppercase text-indigo-500">Live Rank: #{myRank}</span>}
           </div>
 
           <div className="h-10 w-[1px] bg-gray-200 dark:bg-white/5 mx-2" />
@@ -384,7 +384,7 @@ export default function StudentPage() {
           <div className="flex items-center gap-4 group cursor-pointer">
             <div className="flex flex-col items-end">
               <span className="text-sm font-black leading-none text-foreground">Hi, {firstName}</span>
-              <button onClick={logout} className="text-[9px] font-black text-muted-foreground hover:text-red-500 transition-colors uppercase tracking-[0.2em] mt-1.5 opacity-60 hover:opacity-100">Terminate Session</button>
+              <button onClick={logout} className="text-[9px] font-black text-muted-foreground hover:text-red-500 transition-colors uppercase tracking-[0.2em] mt-1.5 opacity-60 hover:opacity-100">Log Out</button>
             </div>
             <div className="w-11 h-11 premium-gradient rounded-2xl flex items-center justify-center text-white font-black shadow-xl shadow-indigo-500/10 border-2 border-white dark:border-gray-800 relative">
               <span className="text-lg">{name.charAt(0).toUpperCase()}</span>
@@ -400,13 +400,13 @@ export default function StudentPage() {
         <aside className="w-80 glass border-r border-gray-200 dark:border-white/5 p-8 flex flex-col gap-8 flex-shrink-0 relative z-40">
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h3 className="text-[10px] font-black uppercase tracking-[0.25em] text-muted-foreground opacity-60">Session Matrix</h3>
-              <span className="text-[9px] bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 px-3 py-1 rounded-lg font-black uppercase tracking-widest border border-indigo-500/20">{questions.length} Problems</span>
+              <h3 className="text-[10px] font-black uppercase tracking-[0.25em] text-muted-foreground opacity-60">Overview</h3>
+              <span className="text-[9px] bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 px-3 py-1 rounded-lg font-black uppercase tracking-widest border border-indigo-500/20">{questions.length} Questions</span>
             </div>
             
             <div className="flex gap-1.5 p-1.5 bg-gray-100 dark:bg-black/40 rounded-2xl border border-gray-200/50 dark:border-white/5 shadow-inner">
-              <button onClick={() => setTab('questions')} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${tab === 'questions' ? 'bg-white dark:bg-gray-800 shadow-xl text-indigo-600 dark:text-indigo-400 border border-gray-200 dark:border-white/5' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}>Challenges</button>
-              <button onClick={() => setTab('leaderboard')} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${tab === 'leaderboard' ? 'bg-white dark:bg-gray-800 shadow-xl text-indigo-600 dark:text-indigo-400 border border-gray-200 dark:border-white/5' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}>Standings</button>
+              <button onClick={() => setTab('questions')} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${tab === 'questions' ? 'bg-white dark:bg-gray-800 shadow-xl text-indigo-600 dark:text-indigo-400 border border-gray-200 dark:border-white/5' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}>Questions</button>
+              <button onClick={() => setTab('leaderboard')} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${tab === 'leaderboard' ? 'bg-white dark:bg-gray-800 shadow-xl text-indigo-600 dark:text-indigo-400 border border-gray-200 dark:border-white/5' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}>Leaderboard</button>
             </div>
           </div>
 
@@ -434,7 +434,7 @@ export default function StudentPage() {
                   <div className="flex-1 min-w-0 relative z-10">
                     <p className={`text-sm font-black truncate leading-tight tracking-tight ${acts ? 'text-foreground' : ''}`}>Question {i + 1}</p>
                     <div className="flex items-center gap-2 mt-1.5">
-                      <span className="text-[9px] font-black uppercase tracking-widest text-indigo-500/70">{q.max_marks as number} PTS</span>
+                      <span className="text-[9px] font-black uppercase tracking-widest text-indigo-500/70">{q.max_marks as number} Points</span>
                       <span className="w-1 h-1 rounded-full bg-slate-400 opacity-30" />
                       <span className="text-[9px] font-black uppercase tracking-widest opacity-60 truncate">{q.question_type as string}</span>
                     </div>
@@ -455,7 +455,7 @@ export default function StudentPage() {
                   </div>
                 ))}
                 <button onClick={() => setTab('leaderboard')} className="w-full py-4 text-[10px] font-black uppercase tracking-widest text-indigo-500 hover:text-indigo-400 transition-colors flex items-center justify-center gap-2 group">
-                  Global Metrics <span className="group-hover:translate-x-1 transition-transform">→</span>
+                  View Leaderboard <span className="group-hover:translate-x-1 transition-transform">→</span>
                 </button>
               </div>
             )}
@@ -463,13 +463,13 @@ export default function StudentPage() {
 
           <div className="pt-8 border-t border-gray-100 dark:border-white/5 space-y-4">
             <motion.div initial={false} animate={{ opacity: isWarning ? 1 : 0.8 }} className="p-5 bg-gray-50 dark:bg-black/20 rounded-3xl border border-gray-200/50 dark:border-white/5 shadow-inner">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-500 mb-2 opacity-80">System Analytics</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-500 mb-2 opacity-80">Progress</p>
               <p className="text-xs font-black italic line-clamp-2 leading-relaxed text-foreground opacity-90">{getEncouragement(answeredCount, questions.length, timeLeft)}</p>
             </motion.div>
             
             {activeQ === questions.length - 1 && (
               <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => setShowSubmitConfirm(true)} className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black text-[11px] shadow-xl shadow-emerald-500/20 uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-3">
-                <span className="text-lg">🏁</span> Finalize Assessment
+                <span className="text-lg">🏁</span> Submit Assessment
               </motion.button>
             )}
           </div>
@@ -493,15 +493,15 @@ export default function StudentPage() {
                     <div className="space-y-12">
                       <header className="space-y-6">
                         <div className="flex flex-wrap items-center gap-4">
-                          <span className="px-4 py-1.5 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase tracking-[0.25em] rounded-xl border border-indigo-500/20 shadow-sm">Module {String(activeQ+1).padStart(2, '0')}</span>
-                          <span className="px-4 py-1.5 bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-slate-400 text-[10px] font-black uppercase tracking-widest rounded-xl border border-gray-200 dark:border-white/5">{q.max_marks as number} Weightage</span>
-                          {ans?.reviewed && <span className="px-4 py-1.5 bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg shadow-emerald-500/20">Evaluation: {ans.marks_awarded as number} PTS</span>}
+                          <span className="px-4 py-1.5 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase tracking-[0.25em] rounded-xl border border-indigo-500/20 shadow-sm">Question {String(activeQ+1).padStart(2, '0')}</span>
+                          <span className="px-4 py-1.5 bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-slate-400 text-[10px] font-black uppercase tracking-widest rounded-xl border border-gray-200 dark:border-white/5">{q.max_marks as number} Points</span>
+                          {ans?.reviewed && <span className="px-4 py-1.5 bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg shadow-emerald-500/20">Score: {ans.marks_awarded as number} Points</span>}
                         </div>
                         <div className="space-y-4">
                           <h2 className="text-4xl lg:text-5xl font-black tracking-tight text-balance leading-[1.15] text-foreground italic">{q.question_text as string}</h2>
                           <div className="flex items-center gap-3 opacity-60">
                             <span className="w-8 h-0.5 bg-indigo-500 rounded-full" />
-                            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Optimal performance expected • Secure Environment active</p>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Do your best! Monitoring is active.</p>
                           </div>
                         </div>
                       </header>
@@ -512,7 +512,7 @@ export default function StudentPage() {
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-500 text-sm">💻</div>
-                                <h4 className="text-xs font-black uppercase tracking-[0.2em] text-foreground opacity-80">Logic Implementation</h4>
+                                <h4 className="text-xs font-black uppercase tracking-[0.2em] text-foreground opacity-80">Write Code</h4>
                               </div>
                               {isSub && (
                                 <div className="px-4 py-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-black text-[10px] uppercase tracking-widest rounded-xl flex items-center gap-3 border border-emerald-500/20 shadow-sm">
@@ -534,14 +534,14 @@ export default function StudentPage() {
                             {!isSub && (
                               <div className="flex items-center justify-between gap-8 py-6 px-8 rounded-3xl bg-gray-50 dark:bg-indigo-500/5 border border-gray-200 dark:border-indigo-500/20">
                                 <div className="space-y-1.5">
-                                  <p className="text-xs font-black text-foreground uppercase tracking-wider">Execute Validation Suite</p>
-                                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest leading-relaxed max-w-xs">Code execution will verify logic & automate final grading.</p>
+                                  <p className="text-xs font-black text-foreground uppercase tracking-wider">Run Test Cases</p>
+                                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest leading-relaxed max-w-xs">Run your code to check if it matches the expected output.</p>
                                 </div>
                                 <motion.button whileHover={{ scale: 1.05, filter: "brightness(1.1)" }} whileTap={{ scale: 0.95 }} onClick={() => evaluateCode(qid)} disabled={isEval || !codeDrafts[qid]?.code?.trim()} className={`relative overflow-hidden premium-gradient text-white px-10 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-2xl flex items-center gap-4 transition-all ${isEval ? 'opacity-50 cursor-not-allowed grayscale' : 'shadow-indigo-500/30'}`}>
                                   {isEval ? (
-                                    <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> {polls[qid]?.status === 'queued' ? 'In queue...' : 'Processing...'}</>
+                                    <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> {polls[qid]?.status === 'queued' ? 'In queue...' : 'Running...'}</>
                                   ) : (
-                                    <><span className="text-base leading-none">🚀</span> Commit & Run</>
+                                    <><span className="text-base leading-none">🚀</span> Run Code</>
                                   )}
                                 </motion.button>
                               </div>
@@ -575,7 +575,7 @@ export default function StudentPage() {
                             <div className="flex items-center justify-between px-2">
                               <div className="flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-500 text-sm">📝</div>
-                                <h4 className="text-xs font-black uppercase tracking-[0.2em] text-foreground opacity-80">Theoretical Discourse</h4>
+                                <h4 className="text-xs font-black uppercase tracking-[0.2em] text-foreground opacity-80">Write Answer</h4>
                               </div>
                               {savedAt[qid] && <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Auto-Synced @ {savedAt[qid]}</span>}
                             </div>
@@ -586,7 +586,7 @@ export default function StudentPage() {
                                 onChange={e => setDraftAnswers(p => ({ ...p, [qid]: e.target.value }))}
                                 disabled={isSub}
                                 rows={12}
-                                placeholder="Express your conceptual architectural logic here..."
+                                placeholder="Type your answer here..."
                                 className="w-full bg-transparent border-none focus:ring-0 p-10 text-lg font-medium leading-relaxed resize-none custom-scrollbar text-foreground placeholder-muted-foreground/30"
                               />
                             </div>
@@ -595,9 +595,9 @@ export default function StudentPage() {
                               <div className="flex justify-end pt-4">
                                 <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => saveAnswer(qid)} disabled={saving === qid || !draft?.trim()} className="px-12 py-5 bg-foreground text-background font-black rounded-2xl text-[11px] uppercase tracking-[0.25em] shadow-2xl transition-all hover:bg-slate-800 dark:hover:bg-slate-200 flex items-center gap-3">
                                   {saving === qid ? (
-                                    <><div className="w-3 h-3 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /> Recording...</>
+                                    <><div className="w-3 h-3 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /> Saving...</>
                                   ) : (
-                                    <><span className="text-lg">💾</span> Synchronize Progress</>
+                                    <><span className="text-lg">💾</span> Save Answer</>
                                   )}
                                 </motion.button>
                               </div>
@@ -609,9 +609,9 @@ export default function StudentPage() {
                       <footer className="pt-16 border-t border-gray-100 dark:border-white/5 flex flex-wrap items-center justify-between gap-8">
                         <div className="flex gap-4">
                           <button onClick={() => setActiveQ(i => i - 1)} disabled={activeQ === 0} className="px-10 py-4 rounded-2xl border-2 border-gray-200 dark:border-white/10 font-black text-[11px] uppercase tracking-widest bg-white dark:bg-slate-900/50 hover:bg-gray-50 dark:hover:bg-slate-800 transition-all disabled:opacity-20 shadow-sm flex items-center gap-2">← Previous</button>
-                          <button onClick={() => setActiveQ(i => i + 1)} disabled={activeQ === questions.length - 1} className="px-10 py-4 rounded-2xl border-2 border-gray-200 dark:border-white/10 font-black text-[11px] uppercase tracking-widest bg-white dark:bg-slate-900/50 hover:bg-gray-50 dark:hover:bg-slate-800 transition-all disabled:opacity-20 shadow-sm flex items-center gap-2">Next Module →</button>
+                          <button onClick={() => setActiveQ(i => i + 1)} disabled={activeQ === questions.length - 1} className="px-10 py-4 rounded-2xl border-2 border-gray-200 dark:border-white/10 font-black text-[11px] uppercase tracking-widest bg-white dark:bg-slate-900/50 hover:bg-gray-50 dark:hover:bg-slate-800 transition-all disabled:opacity-20 shadow-sm flex items-center gap-2">Next Question →</button>
                         </div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground opacity-40 italic">System integrity verified • End-to-end encryption active</p>
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground opacity-40 italic">Your work is saved automatically.</p>
                       </footer>
                     </div>
                   );
@@ -620,18 +620,18 @@ export default function StudentPage() {
             ) : (
               <motion.div key="leaderboard" initial={{ opacity: 0, scale: 0.95, y: 30 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ type: "spring", damping: 25 }} className="w-full max-w-5xl space-y-12">
                 <header className="text-center space-y-4">
-                  <div className="inline-block px-5 py-2 bg-indigo-500/10 text-indigo-500 rounded-full font-black text-[10px] uppercase tracking-[0.3em] mb-4">Live Matrix Rankings</div>
-                  <h2 className="text-5xl font-black tracking-tight italic text-foreground">Elite Performance</h2>
-                  <p className="text-muted-foreground font-medium uppercase tracking-widest text-xs opacity-60">Global Synchronization active • Real-time competitive metrics</p>
+                  <div className="inline-block px-5 py-2 bg-indigo-500/10 text-indigo-500 rounded-full font-black text-[10px] uppercase tracking-[0.3em] mb-4">Live Leaderboard</div>
+                  <h2 className="text-5xl font-black tracking-tight italic text-foreground">Top Scores</h2>
+                  <p className="text-muted-foreground font-medium uppercase tracking-widest text-xs opacity-60">Scores update in real-time.</p>
                 </header>
                 <div className="glass-premium rounded-[3rem] overflow-hidden border border-gray-200 dark:border-white/5 shadow-2xl relative">
                   <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/5 blur-[100px] rounded-full translate-x-1/2 -translate-y-1/2" />
                   <table className="w-full text-left border-collapse relative z-10">
                     <thead>
                       <tr className="bg-gray-50/50 dark:bg-white/5 border-b border-gray-100 dark:border-white/5">
-                        <th className="px-10 py-8 text-[10px] font-black uppercase tracking-[0.25em] text-slate-500">Tier</th>
-                        <th className="px-10 py-8 text-[10px] font-black uppercase tracking-[0.25em] text-slate-500">Operator Identifier</th>
-                        <th className="px-10 py-8 text-[10px] font-black uppercase tracking-[0.25em] text-slate-500 text-right">XP Yield</th>
+                        <th className="px-10 py-8 text-[10px] font-black uppercase tracking-[0.25em] text-slate-500">Rank</th>
+                        <th className="px-10 py-8 text-[10px] font-black uppercase tracking-[0.25em] text-slate-500">Student</th>
+                        <th className="px-10 py-8 text-[10px] font-black uppercase tracking-[0.25em] text-slate-500 text-right">Points</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-white/5">
@@ -643,7 +643,7 @@ export default function StudentPage() {
                           <td className="px-10 py-7">
                             <div className="flex items-center gap-4">
                               <span className="font-black text-lg text-foreground tracking-tight group-hover:translate-x-1 transition-transform">{s.name as string}</span>
-                              {s.name === currentUser && <span className="text-[9px] font-black bg-indigo-500 text-white px-3 py-1 rounded-lg uppercase tracking-widest shadow-lg shadow-indigo-500/20">Active Operator</span>}
+                              {s.name === currentUser && <span className="text-[9px] font-black bg-indigo-500 text-white px-3 py-1 rounded-lg uppercase tracking-widest shadow-lg shadow-indigo-500/20">You</span>}
                             </div>
                           </td>
                           <td className="px-10 py-7 font-black text-right text-xl text-indigo-600 dark:text-indigo-400 tabular-nums tracking-tighter group-hover:scale-105 transition-transform">{s.score as number}</td>

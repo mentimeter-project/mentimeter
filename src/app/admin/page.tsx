@@ -140,7 +140,7 @@ export default function AdminDashboard() {
 
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-black text-foreground">All Assessments</h2>
-          <span className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] opacity-50 px-3 py-1 bg-gray-100 dark:bg-white/5 rounded-full border border-gray-200 dark:border-white/5">Auto-refresh Active</span>
+          <span className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] opacity-50 px-3 py-1 bg-gray-100 dark:bg-white/5 rounded-full border border-gray-200 dark:border-white/5">Auto-refresh On</span>
         </div>
 
         {loading ? (
@@ -185,7 +185,7 @@ export default function AdminDashboard() {
                         <motion.div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full"
                           initial={{ width: 0 }} animate={{ width: `${Math.min(100, ((a.response_count || 0) / 67) * 100)}%` }} />
                       </div>
-                      <span className="text-[10px] font-black text-muted-foreground uppercase">{a.response_count}/67 SYNCED</span>
+                      <span className="text-[10px] font-black text-muted-foreground uppercase">{a.response_count}/67 Submitted</span>
                     </div>
                   )}
                 </div>
@@ -205,7 +205,7 @@ export default function AdminDashboard() {
                         ? 'border-red-500/20 bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/20'
                         : 'border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20'
                     }`}>
-                    {a.is_active ? '⏹ Stop' : '▶ Go Live'}
+                    {a.is_active ? '⏹ Stop' : '▶ Start'}
                   </motion.button>
 
                   {!a.is_active && (
