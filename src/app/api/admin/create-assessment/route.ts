@@ -102,22 +102,24 @@ export async function POST(req: NextRequest) {
 
     for (let i = 0; i < questions.length; i++) {
       const q = questions[i];
-      const qType = q.question_type || 'text';
-      const codeMode = qType === 'code' ? (q.code_mode || 'stdin') : 'stdin';
+      let dbQuestionType = 'text';
+      if (q.question_type === 'code') {
+        dbQuestionType = q.code_mode === 'function' ? 'code_function' : 'code_stdin';
+      }
 
       let functionName: string | null = null;
-      if (codeMode === 'function' && q.function_name?.trim()) {
+      if (dbQuestionType === 'code_function' && q.function_name?.trim()) {
         const sanitised = sanitiseFunctionName(q.function_name);
         functionName = sanitised.ok ? sanitised.name : null;
       }
 
       const qResult = await client.query(
-        'INSERT INTO questions (assessment_id, question_text, question_type, code_mode, function_name, max_marks, order_index) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id',
-        [assessmentId, q.question_text, qType, codeMode === 'function', functionName, q.max_marks || 10, i]
+        'INSERT INTO questions (assessment_id, question_text, question_type, function_name, max_marks, order_index) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
+        [assessmentId, q.question_text, dbQuestionType, functionName, q.max_marks || 10, i]
       );
       const questionId = qResult.rows[0].id;
 
-      if (codeMode === 'function' && functionName) {
+      if (dbQuestionType === 'code_function' && functionName) {
         const allTemplates = generateAllTemplates(functionName);
         for (const [langId, tmpl] of Object.entries(allTemplates)) {
           await client.query(

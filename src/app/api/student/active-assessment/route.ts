@@ -20,7 +20,7 @@ export async function GET() {
   }
 
   const questionsRes = await query(
-    'SELECT id, question_text, question_type, code_mode, function_name, max_marks, order_index FROM questions WHERE assessment_id = $1 ORDER BY order_index ASC',
+    'SELECT id, question_text, question_type, function_name, max_marks, order_index FROM questions WHERE assessment_id = $1 ORDER BY order_index ASC',
     [assessment.id as number]
   );
   const questions = questionsRes.rows;
@@ -47,7 +47,7 @@ export async function GET() {
     SELECT qt.question_id, qt.language_id, qt.starter_code
     FROM question_templates qt
     JOIN questions q ON qt.question_id = q.id
-    WHERE q.assessment_id = $1 AND q.code_mode = TRUE
+    WHERE q.assessment_id = $1 AND q.question_type = 'code_function'
   `, [assessment.id as number]);
   const templateRows = templateRowsRes.rows as { question_id: number; language_id: number; starter_code: string }[];
 

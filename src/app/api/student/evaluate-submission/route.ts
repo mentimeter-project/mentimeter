@@ -310,7 +310,7 @@ export async function POST(req: NextRequest) {
         [session.userId, questionId, sourceCode, score]
       );
       await client.query('COMMIT');
-    } catch(err) {
+    } catch (err) {
       await client.query('ROLLBACK');
       throw err;
     } finally {

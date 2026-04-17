@@ -415,7 +415,9 @@ export default function StudentPage() {
                     <div className="flex items-center gap-2 mt-1.5">
                       <span className="text-[9px] font-black uppercase tracking-widest text-indigo-500/70">{q.max_marks as number} Points</span>
                       <span className="w-1 h-1 rounded-full bg-slate-400 opacity-30" />
-                      <span className="text-[9px] font-black uppercase tracking-widest opacity-60 truncate">{q.question_type as string}</span>
+                      <span className="text-[9px] font-black uppercase tracking-widest opacity-60 truncate">
+                        {q.question_type === 'code_function' ? 'CODE (FUNCTION)' : q.question_type === 'code_stdin' ? 'CODE (I/O)' : 'TEXT'}
+                      </span>
                     </div>
                   </div>
 
@@ -486,7 +488,7 @@ export default function StudentPage() {
                       </header>
 
                       <div className="space-y-8">
-                        {q.question_type === 'code' ? (
+                        {q.question_type.startsWith('code') ? (
                           <div className="space-y-8">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-3">
