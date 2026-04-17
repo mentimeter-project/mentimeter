@@ -66,12 +66,32 @@ export default function StudentPage() {
   const startTimeRef = useRef<number | null>(null);
   const tabSwitchRef = useRef(0);
 
-  /** Get starter code for a question+language, preferring function-mode templates */
   const getStarterCode = (questionId: number, languageId: number): string => {
     const tmpl = questionTemplates[questionId];
     if (tmpl?.[languageId]) return tmpl[languageId];
     return LANGUAGES.find(l => l.id === languageId)?.boilerplate ?? '';
   };
+
+  // Pre-populate codeDrafts with starter code when switching to a code question
+  useEffect(() => {
+    if (!questions.length) return;
+    const q = questions[activeQ];
+    if (!q) return;
+    const qid = q.id as number;
+    const questionType = q.question_type as string;
+
+    if (questionType?.startsWith('code') && !codeDrafts[qid]?.code) {
+      const defaultLangId = LANGUAGES[0].id;
+      const starter = getStarterCode(qid, defaultLangId);
+      setCodeDrafts(prev => ({
+        ...prev,
+        [qid]: {
+          code: starter || '# Write your code here\n',
+          languageId: defaultLangId,
+        },
+      }));
+    }
+  }, [activeQ, questions]);
 
   useEffect(() => {
     setDark(document.documentElement.classList.contains('dark'));
@@ -187,7 +207,13 @@ export default function StudentPage() {
     setSaving(null);
   };
 
-  const runCode = async (questionId: number, sourceCode: string, languageId: number, expectedOutput: string, driverCode: string) => {
+  const runCode = async (
+    questionId: number,
+    sourceCode: string,
+    languageId: number,
+    expectedOutput: string,
+    driverCode: string,
+  ) => {
     setRunning(true);
     setRunResult(null);
 
@@ -211,6 +237,7 @@ export default function StudentPage() {
           output: data.error || 'Execution failed',
           isCorrect: false,
           isError: true,
+          stderr: '',
         });
         return;
       }
@@ -219,8 +246,8 @@ export default function StudentPage() {
         output: data.output || 'Code executed but produced no output',
         stdout: data.stdout || '',
         stderr: data.stderr || '',
-        isCorrect: data.isCorrect,
-        isError: data.isError,
+        isCorrect: data.isCorrect ?? false,
+        isError: data.isError ?? false,
         exitCode: data.exitCode,
       });
 
@@ -229,6 +256,7 @@ export default function StudentPage() {
         output: 'Network error — could not reach execution engine',
         isCorrect: false,
         isError: true,
+        stderr: '',
       });
     } finally {
       setRunning(false);
@@ -495,11 +523,32 @@ export default function StudentPage() {
                             
                             <div className="relative group p-1.5 rounded-[2.5rem] bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/5 shadow-2xl transition-all duration-700 hover:ring-2 ring-indigo-500/20">
                               <CodeEditor
-                                value={codeDrafts[qid]?.code ?? (isSub ? (ans.answer_text ?? '') : getStarterCode(qid, codeDrafts[qid]?.languageId ?? LANGUAGES[0].id))}
+                                value={(() => {
+                                  const currentCode = codeDrafts[qid]?.code;
+                                  if (currentCode !== undefined) return currentCode;
+                                  if (isSub) return ans?.answer_text ?? '';
+                                  return getStarterCode(qid, codeDrafts[qid]?.languageId ?? LANGUAGES[0].id);
+                                })()}
                                 languageId={codeDrafts[qid]?.languageId ?? LANGUAGES[0].id}
                                 disabled={isSub}
-                                onChange={(c) => setCodeDrafts(p => ({ ...p, [qid]: { ...p[qid], code: c, languageId: p[qid]?.languageId ?? LANGUAGES[0].id } }))}
-                                onLanguageChange={(l) => setCodeDrafts(p => ({ ...p, [qid]: { code: getStarterCode(qid, l.id), languageId: l.id } }))}
+                                onChange={(c) => {
+                                  setCodeDrafts(p => ({
+                                    ...p,
+                                    [qid]: {
+                                      code: c,
+                                      languageId: p[qid]?.languageId ?? LANGUAGES[0].id,
+                                    },
+                                  }));
+                                }}
+                                onLanguageChange={(l) => {
+                                  setCodeDrafts(p => ({
+                                    ...p,
+                                    [qid]: {
+                                      code: getStarterCode(qid, l.id),
+                                      languageId: l.id,
+                                    },
+                                  }));
+                                }}
                               />
                             </div>
 
@@ -509,13 +558,38 @@ export default function StudentPage() {
                                   <p className="text-xs font-black text-foreground uppercase tracking-wider">Run Test Cases</p>
                                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest leading-relaxed max-w-xs">Run your code to check if it matches the expected output.</p>
                                 </div>
-                                <motion.button whileHover={{ scale: 1.05, filter: "brightness(1.1)" }} whileTap={{ scale: 0.95 }} onClick={() => {
-                                  const langName = LANGUAGES.find(l => l.id === (codeDrafts[qid]?.languageId ?? LANGUAGES[0].id))?.name.toLowerCase() || '';
-                                  // Map Judge0 name 'javascript (node.js)' to 'javascript'
-                                  const parsedLang = langName.includes('javascript') ? 'javascript' : langName.includes('python') ? 'python' : langName;
-                                  const driver = q.question_type === 'code_function' ? getDriverTemplate(parsedLang) : '';
-                                  runCode(qid, codeDrafts[qid]?.code || '', codeDrafts[qid]?.languageId ?? LANGUAGES[0].id, '', driver);
-                                }} disabled={running || !codeDrafts[qid]?.code?.trim()} className={`relative overflow-hidden premium-gradient text-white px-10 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-2xl flex items-center gap-4 transition-all ${running ? 'opacity-50 cursor-not-allowed grayscale' : 'shadow-indigo-500/30'}`}>
+                                <motion.button
+                                  whileHover={{ scale: 1.05, filter: "brightness(1.1)" }}
+                                  whileTap={{ scale: 0.95 }}
+                                  onClick={() => {
+                                    const currentCode = codeDrafts[qid]?.code?.trim()
+                                      || getStarterCode(qid, codeDrafts[qid]?.languageId ?? LANGUAGES[0].id);
+
+                                    if (!currentCode) return;
+
+                                    const langId = codeDrafts[qid]?.languageId ?? LANGUAGES[0].id;
+                                    const langName = LANGUAGES.find(l => l.id === langId)?.name?.toLowerCase() || '';
+                                    const parsedLang = langName.includes('javascript')
+                                      ? 'javascript'
+                                      : langName.includes('python')
+                                        ? 'python'
+                                        : langName;
+
+                                    const driver = q.question_type === 'code_function'
+                                      ? getDriverTemplate(parsedLang)
+                                      : '';
+
+                                    runCode(
+                                      qid,
+                                      currentCode,
+                                      langId,
+                                      (q.expected_output as string) || '',
+                                      driver,
+                                    );
+                                  }}
+                                  disabled={running}
+                                  className={`relative overflow-hidden premium-gradient text-white px-10 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-2xl flex items-center gap-4 transition-all ${running ? 'opacity-50 cursor-not-allowed grayscale' : 'shadow-indigo-500/30'}`}
+                                >
                                   {running ? (
                                     <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Executing...</>
                                   ) : (
