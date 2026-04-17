@@ -285,8 +285,15 @@ export async function assembleCode(input: AssemblyInput): Promise<AssemblyResult
     return { ok: false, error: secError };
   }
 
-  // 4. Assemble — simple concatenation, driver always executes after student code
-  const finalCode = studentCode + '\n\n' + driverCode;
+  // 4. Assemble — driver always executes after student code or hosts the code internally via {{USER_CODE}}
+  let finalCode = '';
+  if (driverCode.includes('{{USER_CODE}}')) {
+    finalCode = driverCode.replace('{{USER_CODE}}', studentCode);
+  } else {
+    finalCode = studentCode + '\n\n' + driverCode;
+  }
+
+  console.log(`\n[CodeAssembler] Final assembled code length: ${finalCode.length} characters`);
 
   return { ok: true, code: finalCode };
 }

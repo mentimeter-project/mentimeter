@@ -429,12 +429,17 @@ export async function executePiston(
 ): Promise<PistonExecuteResponse> {
   await executionQueue.acquire();
   try {
+    if (!opts.sourceCode || opts.sourceCode.trim() === '') {
+      throw new Error("Execution failed: Code cannot be empty");
+    }
+
     // Resolve version if not explicitly provided
     const resolved = opts.version
       ? { language: opts.language, version: opts.version }
       : await resolveLanguageVersion(opts.language);
 
-    const timeout = opts.timeoutMs ?? 10_000;
+    console.log(`\n[Piston Debug] Executing ${resolved.language} ${resolved.version}`);
+    console.log(`[Piston Debug] FINAL SOURCE CODE SENT:\n---\n${opts.sourceCode}\n---\n`);
     
     // Default memory limit: 256MB. Convert to bytes for Piston.
     const memoryBytes = opts.runMemoryLimitMB === -1 
@@ -445,13 +450,14 @@ export async function executePiston(
       language: resolved.language,
       version: resolved.version,
       files: [{ content: opts.sourceCode }],
-      ...(opts.stdin !== undefined && { stdin: opts.stdin }),
-      ...(opts.args?.length && { args: opts.args }),
-      compile_timeout: timeout,
-      run_timeout: Math.min(timeout, 3000),
-      compile_memory_limit: memoryBytes,
-      run_memory_limit: memoryBytes,
     };
+
+    if (opts.stdin !== undefined) {
+      payload.stdin = opts.stdin;
+    }
+    if (opts.args?.length) {
+      payload.args = opts.args;
+    }
 
     const url = getEndpoint('execute');
 
@@ -499,6 +505,12 @@ export async function executePiston(
     // Validate structure
     if (!data || (!data.run && !data.compile)) {
         throw new Error("Execution failed or invalid response structure from Piston");
+    }
+
+    // Throw error if Piston returns no output across both stdout and stderr
+    const out = data.run?.stdout || data.run?.stderr || data.run?.output || "";
+    if (out.trim() === "" && (!data.compile || (data.compile.stdout || data.compile.stderr || data.compile.output || "").trim() === "")) {
+       throw new Error("Execution engine returned empty response");
     }
 
     return data as PistonExecuteResponse;
