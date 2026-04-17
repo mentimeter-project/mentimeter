@@ -1,7 +1,7 @@
 import { getIronSession } from 'iron-session';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
-import db from '@/lib/db';
+import { query } from '@/lib/db';
 import { sessionOptions, SessionData } from '@/lib/session';
 
 export async function GET(_req: NextRequest, { params }: { params: { assessmentId: string } }) {
@@ -12,11 +12,13 @@ export async function GET(_req: NextRequest, { params }: { params: { assessmentI
 
   const aId = parseInt(params.assessmentId);
 
-  const totalQuestions = (db.prepare(
-    'SELECT COUNT(*) as count FROM questions WHERE assessment_id = ?'
-  ).get(aId) as { count: number }).count;
+  const totalQuestionsRes = await query(
+    'SELECT COUNT(*) as count FROM questions WHERE assessment_id = $1',
+    [aId]
+  );
+  const totalQuestions = parseInt(totalQuestionsRes.rows[0].count, 10) || 0;
 
-  const students = db.prepare(`
+  const studentsRes = await query(`
     SELECT
       s.id,
       s.name,
@@ -29,15 +31,17 @@ export async function GET(_req: NextRequest, { params }: { params: { assessmentI
       MAX(r.submitted_at) as last_activity
     FROM students s
     LEFT JOIN responses r ON r.student_id = s.id
-    LEFT JOIN questions q ON r.question_id = q.id AND q.assessment_id = ?
+    LEFT JOIN questions q ON r.question_id = q.id AND q.assessment_id = $1
     GROUP BY s.id
     ORDER BY answered DESC, last_activity DESC
-  `).all(aId) as { id: number; name: string; usn: string; answered: number; tab_switches: number | null; last_activity: string | null }[];
+  `, [aId]);
+  const students = studentsRes.rows as { id: number; name: string; usn: string; answered: string; tab_switches: string | null; last_activity: string | null }[];
 
   const result = students.map(s => ({
     ...s,
+    answered: parseInt(s.answered, 10) || 0,
     total_questions: totalQuestions,
-    tab_switches: s.tab_switches || 0,
+    tab_switches: s.tab_switches ? parseInt(s.tab_switches, 10) : 0,
   }));
 
   return NextResponse.json({ students: result });

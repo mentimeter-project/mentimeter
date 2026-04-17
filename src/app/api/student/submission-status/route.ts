@@ -7,7 +7,7 @@
 import { getIronSession } from 'iron-session';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
-import db from '@/lib/db';
+import { query } from '@/lib/db';
 import { sessionOptions, SessionData } from '@/lib/session';
 
 export async function GET(req: NextRequest) {
@@ -23,13 +23,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Missing logId' }, { status: 400 });
   }
 
-  const log = db
-    .prepare(
-      `SELECT status, error_message, result_payload 
-       FROM submission_logs 
-       WHERE id = ? AND student_id = ?`
-    )
-    .get(logId, session.userId) as any;
+  const logRes = await query(
+    `SELECT status, error_message, result_payload 
+     FROM submission_logs 
+     WHERE id = $1 AND student_id = $2`,
+    [logId, session.userId]
+  );
+  const log = logRes.rows[0] as any;
 
   if (!log) {
     return NextResponse.json({ error: 'Submission not found' }, { status: 404 });

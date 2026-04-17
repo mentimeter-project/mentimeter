@@ -1,7 +1,7 @@
 import { getIronSession } from 'iron-session';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
-import db from '@/lib/db';
+import { query } from '@/lib/db';
 import { sessionOptions, SessionData } from '@/lib/session';
 
 export async function DELETE(req: NextRequest) {
@@ -15,7 +15,8 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: 'Assessment ID required' }, { status: 400 });
   }
 
-  const assessment = db.prepare('SELECT is_active FROM assessments WHERE id = ?').get(assessmentId) as { is_active: number } | undefined;
+  const assessmentRes = await query('SELECT is_active FROM assessments WHERE id = $1', [assessmentId]);
+  const assessment = assessmentRes.rows[0] as { is_active: number } | undefined;
   if (!assessment) {
     return NextResponse.json({ error: 'Assessment not found' }, { status: 404 });
   }
@@ -24,8 +25,7 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: 'Cannot delete a live assessment. Stop it first.' }, { status: 400 });
   }
 
-  // CASCADE delete handles questions and responses automatically
-  db.prepare('DELETE FROM assessments WHERE id = ?').run(assessmentId);
+  await query('DELETE FROM assessments WHERE id = $1', [assessmentId]);
 
   return NextResponse.json({ success: true });
 }

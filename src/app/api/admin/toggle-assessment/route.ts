@@ -1,7 +1,7 @@
 import { getIronSession } from 'iron-session';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
-import db from '@/lib/db';
+import { query } from '@/lib/db';
 import { sessionOptions, SessionData } from '@/lib/session';
 
 export async function POST(req: NextRequest) {
@@ -10,8 +10,8 @@ export async function POST(req: NextRequest) {
 
   const { assessmentId, isActive } = await req.json();
 
-  if (isActive) db.prepare('UPDATE assessments SET is_active = 0').run();
-  db.prepare('UPDATE assessments SET is_active = ? WHERE id = ?').run(isActive ? 1 : 0, assessmentId);
+  if (isActive) await query('UPDATE assessments SET is_active = 0');
+  await query('UPDATE assessments SET is_active = $1 WHERE id = $2', [isActive ? 1 : 0, assessmentId]);
 
   return NextResponse.json({ success: true });
 }

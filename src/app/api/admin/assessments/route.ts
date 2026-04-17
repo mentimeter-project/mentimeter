@@ -1,7 +1,7 @@
 import { getIronSession } from 'iron-session';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import db from '@/lib/db';
+import { query } from '@/lib/db';
 import { sessionOptions, SessionData } from '@/lib/session';
 
 export async function GET() {
@@ -10,7 +10,7 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
   }
 
-  const assessments = db.prepare(`
+  const assessmentsRes = await query(`
     SELECT
       a.*,
       (SELECT COUNT(*) FROM questions q WHERE q.assessment_id = a.id) as question_count,
@@ -26,7 +26,8 @@ export async function GET() {
       ) as pending_review
     FROM assessments a
     ORDER BY a.created_at DESC
-  `).all();
+  `);
+  const assessments = assessmentsRes.rows;
 
   return NextResponse.json({ assessments });
 }

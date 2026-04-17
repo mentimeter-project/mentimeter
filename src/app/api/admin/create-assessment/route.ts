@@ -1,7 +1,7 @@
 import { getIronSession } from 'iron-session';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
-import db from '@/lib/db';
+import pool from '@/lib/db';
 import { sessionOptions, SessionData } from '@/lib/session';
 import { generateAllTemplates } from '@/lib/driver-templates';
 
@@ -89,54 +89,63 @@ export async function POST(req: NextRequest) {
   }
   // ──────────────────────────────────────────────────────────────────────────
 
-  const insertTestCase = db.prepare(
-    'INSERT INTO test_cases (question_id, input, expected_output, marks) VALUES (?, ?, ?, ?)'
-  );
+  const client = await pool.connect();
+  let assessmentId: number;
+  try {
+    await client.query('BEGIN');
+    
+    const assessmentRes = await client.query(
+      'INSERT INTO assessments (title, description, duration_minutes, created_by) VALUES ($1, $2, $3, $4) RETURNING id',
+      [title, description || '', duration_minutes || 30, session.userId]
+    );
+    assessmentId = assessmentRes.rows[0].id;
 
-  const insertTemplate = db.prepare(
-    'INSERT INTO question_templates (question_id, language_id, starter_code, driver_code) VALUES (?, ?, ?, ?)'
-  );
-
-  const result = db.transaction(() => {
-    const assessment = db.prepare(
-      'INSERT INTO assessments (title, description, duration_minutes, created_by) VALUES (?, ?, ?, ?)'
-    ).run(title, description || '', duration_minutes || 30, session.userId);
-
-    questions.forEach((q: QuestionInput, i: number) => {
+    for (let i = 0; i < questions.length; i++) {
+      const q = questions[i];
       const qType = q.question_type || 'text';
       const codeMode = qType === 'code' ? (q.code_mode || 'stdin') : 'stdin';
 
-      // Sanitise the function name (pre-validated above, so this always succeeds)
       let functionName: string | null = null;
       if (codeMode === 'function' && q.function_name?.trim()) {
         const sanitised = sanitiseFunctionName(q.function_name);
         functionName = sanitised.ok ? sanitised.name : null;
       }
 
-      const qResult = db.prepare(
-        'INSERT INTO questions (assessment_id, question_text, question_type, code_mode, function_name, max_marks, order_index) VALUES (?, ?, ?, ?, ?, ?, ?)'
-      ).run(assessment.lastInsertRowid, q.question_text, qType, codeMode, functionName, q.max_marks || 10, i);
+      const qResult = await client.query(
+        'INSERT INTO questions (assessment_id, question_text, question_type, code_mode, function_name, max_marks, order_index) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id',
+        [assessmentId, q.question_text, qType, codeMode, functionName, q.max_marks || 10, i]
+      );
+      const questionId = qResult.rows[0].id;
 
-      // Auto-generate starter + driver templates for function-mode questions
       if (codeMode === 'function' && functionName) {
         const allTemplates = generateAllTemplates(functionName);
         for (const [langId, tmpl] of Object.entries(allTemplates)) {
-          insertTemplate.run(qResult.lastInsertRowid, Number(langId), tmpl.starterCode, tmpl.driverCode);
+          await client.query(
+            'INSERT INTO question_templates (question_id, language_id, starter_code, driver_code) VALUES ($1, $2, $3, $4)',
+            [questionId, Number(langId), tmpl.starterCode, tmpl.driverCode]
+          );
         }
       }
 
-      // Insert test cases for coding questions
       if (qType === 'code' && Array.isArray(q.test_cases)) {
         for (const tc of q.test_cases) {
           if (tc.expected_output?.trim()) {
-            insertTestCase.run(qResult.lastInsertRowid, tc.input || '', tc.expected_output.trim(), tc.marks || 1);
+            await client.query(
+              'INSERT INTO test_cases (question_id, input, expected_output, marks) VALUES ($1, $2, $3, $4)',
+              [questionId, tc.input || '', tc.expected_output.trim(), tc.marks || 1]
+            );
           }
         }
       }
-    });
+    }
 
-    return assessment.lastInsertRowid;
-  })();
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 
-  return NextResponse.json({ success: true, assessmentId: result });
+  return NextResponse.json({ success: true, assessmentId });
 }

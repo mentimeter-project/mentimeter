@@ -1,7 +1,7 @@
 import { getIronSession } from 'iron-session';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
-import db from '@/lib/db';
+import { query } from '@/lib/db';
 import { sessionOptions, SessionData } from '@/lib/session';
 
 export async function POST(req: NextRequest) {
@@ -11,9 +11,10 @@ export async function POST(req: NextRequest) {
   const { questionId, answerText, selectedAnswer } = await req.json();
   const text = answerText || selectedAnswer || '';
 
-  db.prepare(
-    'INSERT OR REPLACE INTO responses (student_id, question_id, answer_text) VALUES (?, ?, ?)'
-  ).run(session.userId, questionId, text);
+  await query(
+    'INSERT INTO responses (student_id, question_id, answer_text) VALUES ($1, $2, $3) ON CONFLICT (student_id, question_id) DO UPDATE SET answer_text = $3',
+    [session.userId, questionId, text]
+  );
 
   return NextResponse.json({ success: true });
 }

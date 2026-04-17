@@ -9,7 +9,8 @@
 import { getIronSession } from 'iron-session';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
-import db from '@/lib/db';
+import { query } from '@/lib/db';
+import pool from '@/lib/db';
 import { sessionOptions, SessionData } from '@/lib/session';
 import {
   executePistonTimed,
@@ -70,14 +71,14 @@ export async function POST(req: NextRequest) {
   }
 
   // 2. Validate the question
-  const question = db
-    .prepare(
-      `SELECT q.id, q.assessment_id, q.question_type, q.code_mode, q.function_name, q.max_marks
-       FROM questions q
-       JOIN assessments a ON q.assessment_id = a.id
-       WHERE q.id = ? AND a.is_active = 1`
-    )
-    .get(questionId) as any;
+  const questionRes = await query(
+    `SELECT q.id, q.assessment_id, q.question_type, q.code_mode, q.function_name, q.max_marks
+     FROM questions q
+     JOIN assessments a ON q.assessment_id = a.id
+     WHERE q.id = $1 AND a.is_active = 1`,
+    [questionId]
+  );
+  const question = questionRes.rows[0] as any;
 
   if (!question) {
     return NextResponse.json(
@@ -113,9 +114,8 @@ export async function POST(req: NextRequest) {
   }
 
   // 3. One-shot lock — no re-submissions
-  const prev = db
-    .prepare('SELECT id FROM code_submissions WHERE student_id = ? AND question_id = ?')
-    .get(session.userId, questionId);
+  const prevRes = await query('SELECT id FROM code_submissions WHERE student_id = $1 AND question_id = $2', [session.userId, questionId]);
+  const prev = prevRes.rows[0];
   if (prev) {
     return NextResponse.json(
       { error: 'Already submitted', alreadySubmitted: true },
@@ -124,9 +124,8 @@ export async function POST(req: NextRequest) {
   }
 
   // 4. Fetch test cases
-  const testCases = db
-    .prepare('SELECT id, input, expected_output, marks FROM test_cases WHERE question_id = ? ORDER BY id ASC')
-    .all(questionId) as TestCase[];
+  const testCasesRes = await query('SELECT id, input, expected_output, marks FROM test_cases WHERE question_id = $1 ORDER BY id ASC', [questionId]);
+  const testCases = testCasesRes.rows as TestCase[];
 
   if (testCases.length === 0) {
     return NextResponse.json(
@@ -156,9 +155,8 @@ export async function POST(req: NextRequest) {
   if (question.code_mode === 'function') {
     const functionName: string = question.function_name!;
 
-    const template = db
-      .prepare('SELECT driver_code FROM question_templates WHERE question_id = ? AND language_id = ?')
-      .get(questionId, languageId) as { driver_code: string } | undefined;
+    const templateRes = await query('SELECT driver_code FROM question_templates WHERE question_id = $1 AND language_id = $2', [questionId, languageId]);
+    const template = templateRes.rows[0] as { driver_code: string } | undefined;
 
     let driverCode: string;
     if (template?.driver_code) {
@@ -296,30 +294,28 @@ export async function POST(req: NextRequest) {
 
   // 9. Store results in DB
   try {
-    const saveSubmission = db.transaction(() => {
-      db.prepare(
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(
         `INSERT INTO code_submissions
            (student_id, question_id, language_id, source_code, score, test_cases_passed, total_test_cases, compilation_error)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-      ).run(
-        session.userId,
-        questionId,
-        languageId,
-        sourceCode,
-        score,
-        passed,
-        testCases.length,
-        compilationError
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [session.userId, questionId, languageId, sourceCode, score, passed, testCases.length, compilationError]
       );
-
-      db.prepare(
-        `INSERT OR REPLACE INTO responses
+      await client.query(
+        `INSERT INTO responses
            (student_id, question_id, answer_text, marks_awarded, reviewed)
-         VALUES (?, ?, ?, ?, 1)`
-      ).run(session.userId, questionId, sourceCode, score);
-    });
-
-    saveSubmission();
+         VALUES ($1, $2, $3, $4, 1) ON CONFLICT (student_id, question_id) DO UPDATE SET answer_text = $3, marks_awarded = $4, reviewed = 1`,
+        [session.userId, questionId, sourceCode, score]
+      );
+      await client.query('COMMIT');
+    } catch(err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
   } catch (err: any) {
     console.error('[evaluate-submission] DB save error:', err);
     return NextResponse.json(

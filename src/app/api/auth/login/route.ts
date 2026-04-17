@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getIronSession } from 'iron-session';
 import { cookies } from 'next/headers';
-import db from '@/lib/db';
+import { query } from '@/lib/db';
 import { sessionOptions, SessionData } from '@/lib/session';
 
 export async function POST(req: NextRequest) {
@@ -16,9 +16,11 @@ export async function POST(req: NextRequest) {
   let user: Record<string, unknown> | undefined;
 
   if (role === 'admin') {
-    user = db.prepare('SELECT * FROM admins WHERE username = ? AND password = ?').get(username, password) as Record<string, unknown> | undefined;
+    const res = await query('SELECT * FROM admins WHERE username = $1 AND password = $2', [username, password]);
+    user = res.rows[0];
   } else {
-    user = db.prepare('SELECT * FROM students WHERE username = ? AND password = ?').get(username, password) as Record<string, unknown> | undefined;
+    const res = await query('SELECT * FROM students WHERE username = $1 AND password = $2', [username, password]);
+    user = res.rows[0];
   }
 
   if (!user) return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
