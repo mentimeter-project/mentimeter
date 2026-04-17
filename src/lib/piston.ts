@@ -474,10 +474,10 @@ export async function executePiston(
     }
 
     const text = await res.text();
-    console.log(`[Piston] RAW EXECUTION RESPONSE:`, text);
+    console.log(`\n[Piston Debug] RAW EXECUTION RESPONSE (HTTP ${res.status}):\n`, text);
 
     if (!text || text.trim() === "") {
-      throw new Error(`Empty response from Piston execution engine (HTTP ${res.status})`);
+      throw new Error(`Empty response from Piston execution engine. Expected JSON payload with stdout/stderr.`);
     }
 
     let data: any;
@@ -564,7 +564,7 @@ export function normalisePistonResponse(
   wallClockMs?: number,
 ): NormalisedResult {
   const compile = raw.compile ?? null;
-  const run = raw.run;
+  const run = raw.run ?? { stdout: '', stderr: '', code: 0, signal: null, output: '' };
   const timeStr = wallClockMs != null ? (wallClockMs / 1000).toFixed(3) : null;
 
   // ── Compile error ────────────────────────────────────────────────────────
@@ -574,6 +574,18 @@ export function normalisePistonResponse(
       stdout: null,
       stderr: compile.stderr || null,
       compile_output: (compile.stderr || compile.stdout || compile.output || 'Compilation failed').trim() || null,
+      time: timeStr,
+      memory: null,
+    };
+  }
+
+  // ── Invalid Response / Missing Run ──────────────────────────────────────
+  if (!raw.run) {
+    return {
+      status: { id: PISTON_STATUS.INTERNAL_ERROR, description: 'Internal Error' },
+      stdout: null,
+      stderr: 'Execution engine failed to process the run stage.',
+      compile_output: compile?.stdout?.trim() || null,
       time: timeStr,
       memory: null,
     };
@@ -604,11 +616,17 @@ export function normalisePistonResponse(
   }
 
   // ── Successful execution — check output if expected is provided ──────────
-  const stdout = run.stdout ?? '';
+  // Extract and normalize output, safely falling back to stderr if stdout is completely empty
+  const stdoutStr = (run.stdout && run.stdout.trim() !== '') ? run.stdout : '';
+  const stderrStr = (run.stderr && run.stderr.trim() !== '') ? run.stderr : '';
+  
+  // Safe fallback if no output is returned: Provide empty string instead of null, 
+  // and prioritize capturing errors if stderr has data but stdout doesn't.
+  const finalStdout = stdoutStr || (stderrStr ? 'Finished with stderr output only' : '');
 
   if (expectedOutput !== undefined) {
     let isMatch = false;
-    const actualTrimmed = stdout.trim();
+    const actualTrimmed = stdoutStr.trim();
     const expectedTrimmed = expectedOutput.trim();
 
     if (actualTrimmed === expectedTrimmed) {
@@ -646,7 +664,7 @@ export function normalisePistonResponse(
     if (!isMatch) {
       return {
         status: { id: PISTON_STATUS.WRONG_ANSWER, description: 'Wrong Answer' },
-        stdout: stdout || null,
+        stdout: stdoutStr || stderrStr || null,
         stderr: run.stderr || null,
         compile_output: compile?.stdout?.trim() || null,
         time: timeStr,
@@ -657,7 +675,7 @@ export function normalisePistonResponse(
 
   return {
     status: { id: PISTON_STATUS.ACCEPTED, description: 'Accepted' },
-    stdout: stdout || null,
+    stdout: finalStdout || null,
     stderr: run.stderr || null,
     compile_output: compile?.stdout?.trim() || null,
     time: timeStr,
