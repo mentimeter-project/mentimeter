@@ -3,7 +3,7 @@ import { getIronSession } from 'iron-session';
 import { cookies } from 'next/headers';
 import { sessionOptions, SessionData } from '@/lib/session';
 
-const PISTON_URL = process.env.PISTON_URL || 'http://localhost:2000/api/v2/piston';
+const PISTON_URL = process.env.PISTON_URL || 'http://localhost:2000/api/v2';
 
 // ── Normalize output: strip whitespace/newlines for comparison ──
 function normalizeOutput(str: string): string {
