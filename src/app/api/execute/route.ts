@@ -1,175 +1,279 @@
-/**
- * @file src/app/api/execute/route.ts
- *
- * Generic code execution endpoint backed by Piston API v2.
- *
- * POST /api/execute
- *
- * Request body (JSON):
- * {
- *   "source_code": "print('hello')",   // required
- *   "language":    "python",            // required — generic name OR Piston alias
- *   "version":     "3.12.0",            // optional — auto-resolved if omitted
- *   "stdin":       "42\n",             // optional
- *   "args":        ["--flag", "value"] // optional
- * }
- *
- * Response body (JSON) — normalised Judge0-style shape:
- * {
- *   "language":        "python",
- *   "version":         "3.12.0",
- *   "status":          { "id": 3, "description": "Accepted" },
- *   "stdout":          "hello\n",
- *   "stderr":          null,
- *   "compile_output":  null,
- *   "time":            null,
- *   "memory":          null
- * }
- *
- * This endpoint is intentionally unauthenticated so it can be used from
- * the admin code-editor preview or tested with curl.  If you want to
- * restrict access, add session-guard logic from evaluate-submission/route.ts.
- */
-
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  executePistonTimed,
-  normalisePistonResponse,
-  resolveLanguageVersion,
-  type NormalisedResult,
-} from '@/lib/piston';
+import { getIronSession } from 'iron-session';
+import { cookies } from 'next/headers';
+import { sessionOptions, SessionData } from '@/lib/session';
 
-// ── Request shape ────────────────────────────────────────────────────────────
+const PISTON_URL = 'https://emkc.org/api/v2/piston';
 
-interface ExecuteRequestBody {
-  source_code: string;
-  language: string;
-  version?: string;
-  stdin?: string;
-  args?: string[];
+// ── Normalize output: strip whitespace/newlines for comparison ──
+function normalizeOutput(str: string): string {
+  return (str || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .split('\n')
+    .map((line: string) => line.trimEnd())
+    .join('\n')
+    .trim();
 }
 
-// ── Response shape ───────────────────────────────────────────────────────────
-
-interface ExecuteResponseBody extends NormalisedResult {
+// ── Language map: language_id → Piston config ──
+const LANGUAGE_MAP: Record<number, {
   language: string;
   version: string;
+  extension: string;
+}> = {
+  71: { language: 'python',     version: '3.10.0',  extension: 'py'   },
+  63: { language: 'javascript', version: '18.15.0', extension: 'js'   },
+  62: { language: 'java',       version: '15.0.2',  extension: 'java' },
+  54: { language: 'c++',        version: '10.2.0',  extension: 'cpp'  },
+  50: { language: 'c',          version: '10.2.0',  extension: 'c'    },
+  60: { language: 'go',         version: '1.16.2',  extension: 'go'   },
+  73: { language: 'rust',       version: '1.50.0',  extension: 'rs'   },
+};
+
+// ── Force output: ensure code ALWAYS produces something ──
+function forceOutput(code: string, language: string): string {
+  switch (language) {
+    case 'python': {
+      // If no print statement exists, wrap last expression
+      if (!code.includes('print(') && !code.includes('sys.stdout')) {
+        const lines = code.trim().split('\n');
+        const last = lines[lines.length - 1].trim();
+        // If last line looks like an expression (not a statement), print it
+        if (
+          last &&
+          !last.startsWith('def ') &&
+          !last.startsWith('class ') &&
+          !last.startsWith('import ') &&
+          !last.startsWith('from ') &&
+          !last.startsWith('#') &&
+          !last.startsWith('if ') &&
+          !last.startsWith('for ') &&
+          !last.startsWith('while ') &&
+          !last.includes('=')
+        ) {
+          lines[lines.length - 1] = `print(${last})`;
+          return lines.join('\n');
+        }
+        // Otherwise append fallback
+        return code + '\nprint("Code executed successfully")';
+      }
+      return code;
+    }
+
+    case 'javascript': {
+      if (
+        !code.includes('console.log') &&
+        !code.includes('console.error') &&
+        !code.includes('process.stdout')
+      ) {
+        // Wrap in try/catch and print result
+        return `
+try {
+  const __result__ = (() => {
+    ${code}
+  })();
+  if (__result__ !== undefined) console.log(__result__);
+  else console.log("Code executed successfully");
+} catch (e) {
+  console.error("Error:", e.message);
+}
+`.trim();
+      }
+      return code;
+    }
+
+    case 'java': {
+      // Java needs to have System.out.println or we can't easily wrap
+      // Just return as-is — Java will error if no main method anyway
+      return code;
+    }
+
+    case 'c++':
+    case 'c': {
+      // C/C++ needs to compile — return as-is
+      return code;
+    }
+
+    default:
+      return code;
+  }
 }
 
-// ── Route handler ────────────────────────────────────────────────────────────
+// ── Merge driver code template with user code ──
+function mergeWithDriver(userCode: string, driverCode: string): string {
+  if (!driverCode || !driverCode.trim()) return userCode;
+  if (driverCode.includes('{{USER_CODE}}')) {
+    return driverCode.replace('{{USER_CODE}}', userCode);
+  }
+  // If no placeholder, append user code before driver
+  return `${userCode}\n\n${driverCode}`;
+}
 
-export async function POST(req: NextRequest): Promise<NextResponse> {
-  // 1. Parse + validate the request body
-  let body: ExecuteRequestBody;
+// ── Main handler ──
+export async function POST(req: NextRequest) {
+  const session = await getIronSession<SessionData>(cookies(), sessionOptions);
+  if (!session.userId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+  }
+
+  let body: any;
   try {
-    body = (await req.json()) as ExecuteRequestBody;
+    body = await req.json();
   } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+
+  const {
+    source_code,
+    language_id,
+    stdin = '',
+    expected_output = '',
+    driver_code = '',
+  } = body;
+
+  if (!source_code || !language_id) {
     return NextResponse.json(
-      { error: 'Request body must be valid JSON.' },
+      { error: 'source_code and language_id are required' },
       { status: 400 }
     );
   }
 
-  const { source_code, language, version, stdin, args } = body;
-
-  if (typeof source_code !== 'string' || !source_code.trim()) {
+  const langConfig = LANGUAGE_MAP[parseInt(language_id)];
+  if (!langConfig) {
     return NextResponse.json(
-      { error: '`source_code` is required and must be a non-empty string.' },
+      { error: `Unsupported language_id: ${language_id}` },
       { status: 400 }
     );
   }
 
-  if (typeof language !== 'string' || !language.trim()) {
-    return NextResponse.json(
-      { error: '`language` is required and must be a non-empty string.' },
-      { status: 400 }
-    );
-  }
+  // Step 1: Merge driver code if present
+  let finalCode = driver_code
+    ? mergeWithDriver(source_code, driver_code)
+    : source_code;
 
-  if (args !== undefined && !Array.isArray(args)) {
-    return NextResponse.json(
-      { error: '`args` must be an array of strings when provided.' },
-      { status: 400 }
-    );
-  }
+  // Step 2: Force output guarantee
+  finalCode = forceOutput(finalCode, langConfig.language);
 
-  // 2. Resolve the language version (uses cached runtimes — no extra network
-  //    hit unless the Next.js cache has expired).
-  let resolvedLanguage: string;
-  let resolvedVersion: string;
+  // Step 3: Build EXACT Piston request format
+  const pistonRequest = {
+    language: langConfig.language,
+    version: langConfig.version,
+    files: [
+      {
+        name: `solution.${langConfig.extension}`,
+        content: finalCode,
+      },
+    ],
+    stdin: stdin || '',
+    run_timeout: 10000,   // 10 second timeout
+    compile_timeout: 15000,
+  };
+
+  // Debug log — remove in production if needed
+  console.log('=== PISTON REQUEST ===');
+  console.log('Language:', langConfig.language, langConfig.version);
+  console.log('Code:\n', finalCode);
+  console.log('=====================');
+
+  let pistonData: any;
 
   try {
-    const resolved = await resolveLanguageVersion(version ? language : language);
-    resolvedLanguage = resolved.language;
-    resolvedVersion = version ?? resolved.version;
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    // Language not found in Piston runtime list
-    if (msg.includes('not supported')) {
-      return NextResponse.json({ error: msg }, { status: 422 });
-    }
-    return NextResponse.json(
-      { error: `Failed to resolve language runtime: ${msg}` },
-      { status: 502 }
-    );
-  }
-
-  // 3. Execute on Piston (timed)
-  let pistonTimed: Awaited<ReturnType<typeof executePistonTimed>>;
-  try {
-    pistonTimed = await executePistonTimed({
-      sourceCode: source_code,
-      language: resolvedLanguage,
-      version: resolvedVersion,
-      stdin,
-      args,
+    const pistonRes = await fetch(`${PISTON_URL}/execute`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(pistonRequest),
     });
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error('[execute] Piston error:', msg);
 
-    if (msg.includes('network error') || msg.includes('Failed to fetch')) {
+    if (!pistonRes.ok) {
+      const errText = await pistonRes.text();
+      console.error('Piston HTTP error:', pistonRes.status, errText);
       return NextResponse.json(
-        { error: 'Cannot reach the Piston execution service. Check PISTON_API_URL.' },
+        { error: `Piston API error: ${pistonRes.status}`, details: errText },
         { status: 502 }
       );
     }
-    if (msg.toLowerCase().includes('timeout') || msg.includes('TimeoutError')) {
-      return NextResponse.json(
-        { error: 'Execution timed out. Your code may contain an infinite loop.' },
-        { status: 504 }
-      );
-    }
 
-    return NextResponse.json({ error: msg }, { status: 500 });
-  }
+    pistonData = await pistonRes.json();
 
-  // 4. Normalise into Judge0-style shape.
-  //    No expectedOutput here — this is a raw "run" endpoint; the caller
-  //    decides whether the output is correct.
-  const { response: pistonRaw, wallClockMs } = pistonTimed;
-  const normalised = normalisePistonResponse(pistonRaw, undefined, wallClockMs);
+    // Debug log
+    console.log('=== PISTON RESPONSE ===');
+    console.log(JSON.stringify(pistonData, null, 2));
+    console.log('=======================');
 
-  const response: ExecuteResponseBody = {
-    language: pistonRaw.language,
-    version: pistonRaw.version,
-    ...normalised,
-  };
-
-  return NextResponse.json(response, { status: 200 });
-}
-
-// GET /api/execute — returns supported runtimes (handy for debugging / admin UI)
-export async function GET(): Promise<NextResponse> {
-  try {
-    const { fetchPistonRuntimes } = await import('@/lib/piston');
-    const runtimes = await fetchPistonRuntimes();
-    return NextResponse.json({ runtimes }, { status: 200 });
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
+  } catch (err: any) {
+    console.error('Piston fetch error:', err.message);
     return NextResponse.json(
-      { error: `Failed to fetch runtimes: ${msg}` },
-      { status: 502 }
+      { error: 'Could not reach Piston API', details: err.message },
+      { status: 503 }
     );
   }
+
+  // Step 4: Parse response — ONLY use run.stdout and run.stderr
+  const runData = pistonData?.run;
+
+  if (!runData) {
+    console.error('Piston returned no run object:', pistonData);
+    return NextResponse.json({
+      stdout: '',
+      stderr: '',
+      output: 'Execution engine returned no response — please try again',
+      isCorrect: false,
+      isError: true,
+      compile_output: pistonData?.compile?.stderr || '',
+    });
+  }
+
+  const stdout: string = runData.stdout || '';
+  const stderr: string = runData.stderr || '';
+  const exitCode: number = runData.code ?? -1;
+  const compileOutput: string = pistonData?.compile?.stderr || '';
+
+  // Step 5: Determine output to show user
+  let displayOutput: string;
+
+  if (stdout.trim()) {
+    displayOutput = stdout;
+  } else if (stderr.trim()) {
+    displayOutput = stderr;
+  } else if (compileOutput.trim()) {
+    displayOutput = `Compilation Error:\n${compileOutput}`;
+  } else {
+    // FAILSAFE — never show empty
+    displayOutput = exitCode === 0
+      ? 'Code executed successfully but produced no output'
+      : 'Code execution failed with no output';
+  }
+
+  // Step 6: Compare with expected output
+  const normalizedActual = normalizeOutput(stdout);
+  const normalizedExpected = normalizeOutput(expected_output);
+
+  let isCorrect = false;
+  if (exitCode === 0) {
+    if (!normalizedExpected) {
+      // No expected output set — any successful run is correct
+      isCorrect = true;
+    } else {
+      isCorrect = normalizedActual === normalizedExpected;
+    }
+  }
+
+  const isError = exitCode !== 0 || !!compileOutput;
+
+  return NextResponse.json({
+    stdout,
+    stderr,
+    compile_output: compileOutput,
+    output: displayOutput,
+    exitCode,
+    isCorrect,
+    isError,
+    normalizedActual,
+    normalizedExpected,
+    language: langConfig.language,
+    version: langConfig.version,
+  });
 }

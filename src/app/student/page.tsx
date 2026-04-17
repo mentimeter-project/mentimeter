@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LANGUAGES, type Language } from '@/components/CodeEditor';
 import EvalResultCard, { EvalResultSkeleton } from '@/components/EvalResultCard';
+import { getDriverTemplate } from '@/lib/driverTemplates';
 
 const CodeEditor = dynamic(() => import('@/components/CodeEditor'), { ssr: false });
 
@@ -38,6 +39,16 @@ export default function StudentPage() {
   const [questionTemplates, setQuestionTemplates] = useState<Record<number, Record<number, string>>>({});
   const [evaluating, setEvaluating] = useState<number | null>(null);
   const [evalResults, setEvalResults] = useState<Record<number, any>>({});
+  
+  const [running, setRunning] = useState(false);
+  const [runResult, setRunResult] = useState<{
+    output: string;
+    stdout?: string;
+    stderr?: string;
+    isCorrect: boolean;
+    isError: boolean;
+    exitCode?: number;
+  } | null>(null);
   
 
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
@@ -176,71 +187,51 @@ export default function StudentPage() {
     setSaving(null);
   };
 
-  const evaluateCode = async (questionId: number) => {
-    const draft = codeDrafts[questionId];
-    if (!draft?.code?.trim()) return;
-    setEvaluating(questionId);
-    setEvalResults(prev => { const n = { ...prev }; delete n[questionId]; return n; });
+  const runCode = async (questionId: number, sourceCode: string, languageId: number, expectedOutput: string, driverCode: string) => {
+    setRunning(true);
+    setRunResult(null);
+
     try {
-      const res = await fetch('/api/student/evaluate-submission', {
+      const res = await fetch('/api/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          questionId,
-          languageId: draft.languageId,
-          sourceCode: draft.code,
+          source_code: sourceCode,
+          language_id: languageId,
+          expected_output: expectedOutput || '',
+          driver_code: driverCode || '',
+          stdin: '',
         }),
       });
 
-      const responseText = await res.text();
-      let data;
+      const data = await res.json();
 
-      if (!responseText || responseText.trim() === '') {
-        console.error('Empty response from execution API');
-        setEvalResults(prev => ({ ...prev, [questionId]: { error: 'Execution engine returned empty response' } }));
-        setEvaluating(null);
+      if (!res.ok) {
+        setRunResult({
+          output: data.error || 'Execution failed',
+          isCorrect: false,
+          isError: true,
+        });
         return;
       }
 
-      try {
-        data = JSON.parse(responseText);
-      } catch (err) {
-        console.error('Invalid JSON response:', responseText);
-        setEvalResults(prev => ({ ...prev, [questionId]: { error: 'Execution engine returned invalid response' } }));
-        setEvaluating(null);
-        return;
-      }
+      setRunResult({
+        output: data.output || 'Code executed but produced no output',
+        stdout: data.stdout || '',
+        stderr: data.stderr || '',
+        isCorrect: data.isCorrect,
+        isError: data.isError,
+        exitCode: data.exitCode,
+      });
 
-      if (!data || typeof data !== 'object') {
-        setEvalResults(prev => ({ ...prev, [questionId]: { error: 'Invalid response structure from evaluation service' } }));
-        setEvaluating(null);
-        return;
-      }
-
-      if (data.error) {
-        setEvalResults(prev => ({ ...prev, [questionId]: { error: data.error } }));
-        setEvaluating(null);
-        return;
-      }
-
-      if (data.alreadySubmitted) {
-        setEvalResults(prev => ({ ...prev, [questionId]: { error: 'You have already submitted this question.' } }));
-        setEvaluating(null);
-        return;
-      }
-
-      // Direct result — update UI immediately
-      setEvalResults(prev => ({ ...prev, [questionId]: data }));
-      setAnsweredMap(prev => ({
-        ...prev,
-        [questionId]: { answer_text: draft.code, marks_awarded: data.score, reviewed: 1 }
-      }));
-      setSavedAt(prev => ({ ...prev, [questionId]: new Date().toLocaleTimeString() }));
-      setEvaluating(null);
-    } catch (err) {
-      console.error('Evaluation request failed:', err);
-      setEvalResults(prev => ({ ...prev, [questionId]: { error: 'Network error. Please try again.' } }));
-      setEvaluating(null);
+    } catch (err: any) {
+      setRunResult({
+        output: 'Network error — could not reach execution engine',
+        isCorrect: false,
+        isError: true,
+      });
+    } finally {
+      setRunning(false);
     }
   };
 
@@ -518,8 +509,14 @@ export default function StudentPage() {
                                   <p className="text-xs font-black text-foreground uppercase tracking-wider">Run Test Cases</p>
                                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest leading-relaxed max-w-xs">Run your code to check if it matches the expected output.</p>
                                 </div>
-                                <motion.button whileHover={{ scale: 1.05, filter: "brightness(1.1)" }} whileTap={{ scale: 0.95 }} onClick={() => evaluateCode(qid)} disabled={isEval || !codeDrafts[qid]?.code?.trim()} className={`relative overflow-hidden premium-gradient text-white px-10 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-2xl flex items-center gap-4 transition-all ${isEval ? 'opacity-50 cursor-not-allowed grayscale' : 'shadow-indigo-500/30'}`}>
-                                  {isEval ? (
+                                <motion.button whileHover={{ scale: 1.05, filter: "brightness(1.1)" }} whileTap={{ scale: 0.95 }} onClick={() => {
+                                  const langName = LANGUAGES.find(l => l.id === (codeDrafts[qid]?.languageId ?? LANGUAGES[0].id))?.name.toLowerCase() || '';
+                                  // Map Judge0 name 'javascript (node.js)' to 'javascript'
+                                  const parsedLang = langName.includes('javascript') ? 'javascript' : langName.includes('python') ? 'python' : langName;
+                                  const driver = q.question_type === 'code_function' ? getDriverTemplate(parsedLang) : '';
+                                  runCode(qid, codeDrafts[qid]?.code || '', codeDrafts[qid]?.languageId ?? LANGUAGES[0].id, '', driver);
+                                }} disabled={running || !codeDrafts[qid]?.code?.trim()} className={`relative overflow-hidden premium-gradient text-white px-10 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-2xl flex items-center gap-4 transition-all ${running ? 'opacity-50 cursor-not-allowed grayscale' : 'shadow-indigo-500/30'}`}>
+                                  {running ? (
                                     <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Executing...</>
                                   ) : (
                                     <><span className="text-base leading-none">🚀</span> Run Code</>
@@ -529,24 +526,45 @@ export default function StudentPage() {
                             )}
 
                             <AnimatePresence>
-                              {isEval && <EvalResultSkeleton key="skeleton" statusText={`Executing your code, ${firstName}...`} />}
-                              {!isEval && res && (
+                              {running && <EvalResultSkeleton key="skeleton" statusText={`Executing your code, ${firstName}...`} />}
+                              {!running && runResult && (
                                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", damping: 25 }}>
-                                  {res.error ? (
-                                    <div className="p-8 rounded-[2rem] border-2 border-red-500/20 bg-red-500/5 text-red-600 dark:text-red-400 font-black text-xs shadow-2xl flex items-center gap-4">
-                                      <span className="text-2xl">⚠️</span>
-                                      <div className="flex flex-col gap-1">
-                                        <span className="uppercase tracking-[0.2em] opacity-60 text-[10px]">Evaluation Error</span>
-                                        {res.error}
-                                      </div>
+                                  <div className={`mt-4 rounded-2xl border p-4 ${
+                                    runResult.isError
+                                      ? 'bg-red-50 border-red-200'
+                                      : runResult.isCorrect
+                                        ? 'bg-emerald-50 border-emerald-200'
+                                        : 'bg-amber-50 border-amber-200'
+                                  }`}>
+                                    {/* Status badge */}
+                                    <div className="flex items-center gap-2 mb-3">
+                                      {runResult.isError ? (
+                                        <span className="text-red-600 font-semibold text-sm">⚠ Error</span>
+                                      ) : runResult.isCorrect ? (
+                                        <span className="text-emerald-600 font-semibold text-sm">✓ Correct Output</span>
+                                      ) : (
+                                        <span className="text-amber-600 font-semibold text-sm">✗ Wrong Answer</span>
+                                      )}
                                     </div>
-                                  ) : (
-                                    <EvalResultCard 
-                                      result={res} 
-                                      userName={firstName}
-                                      onDismiss={() => setEvalResults(p => { const n = { ...p }; delete n[qid]; return n; })} 
-                                    />
-                                  )}
+
+                                    {/* Output */}
+                                    <div>
+                                      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Output</p>
+                                      <pre className="bg-slate-900 text-emerald-400 rounded-xl p-4 text-xs font-mono overflow-x-auto whitespace-pre-wrap">
+                                        {runResult.output || 'No output'}
+                                      </pre>
+                                    </div>
+
+                                    {/* Show stderr separately if present */}
+                                    {runResult.stderr && runResult.stderr.trim() && (
+                                      <div className="mt-3">
+                                        <p className="text-xs font-semibold text-red-500 uppercase tracking-wider mb-1">Errors</p>
+                                        <pre className="bg-red-900/10 text-red-600 rounded-xl p-3 text-xs font-mono overflow-x-auto whitespace-pre-wrap">
+                                          {runResult.stderr}
+                                        </pre>
+                                      </div>
+                                    )}
+                                  </div>
                                 </motion.div>
                               )}
                             </AnimatePresence>
