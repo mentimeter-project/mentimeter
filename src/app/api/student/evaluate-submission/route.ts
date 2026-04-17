@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Guard: function-mode questions must have a valid, non-empty function_name ──
-  if (question.code_mode === 'function') {
+  if (question.code_mode === true) {
     const VALID_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
     const fn: string | null = question.function_name ?? null;
     if (!fn || !fn.trim() || !VALID_IDENTIFIER.test(fn.trim())) {
@@ -152,7 +152,7 @@ export async function POST(req: NextRequest) {
   // 6. Assemble Code (handle function-mode vs full-program mode)
   let finalSourceCode: string;
 
-  if (question.code_mode === 'function') {
+  if (question.code_mode === true) {
     const functionName: string = question.function_name!;
 
     const templateRes = await query('SELECT driver_code FROM question_templates WHERE question_id = $1 AND language_id = $2', [questionId, languageId]);

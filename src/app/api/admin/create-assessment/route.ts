@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
 
       const qResult = await client.query(
         'INSERT INTO questions (assessment_id, question_text, question_type, code_mode, function_name, max_marks, order_index) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id',
-        [assessmentId, q.question_text, qType, codeMode, functionName, q.max_marks || 10, i]
+        [assessmentId, q.question_text, qType, codeMode === 'function', functionName, q.max_marks || 10, i]
       );
       const questionId = qResult.rows[0].id;
 

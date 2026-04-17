@@ -47,7 +47,7 @@ export async function GET() {
     SELECT qt.question_id, qt.language_id, qt.starter_code
     FROM question_templates qt
     JOIN questions q ON qt.question_id = q.id
-    WHERE q.assessment_id = $1 AND q.code_mode = 'function'
+    WHERE q.assessment_id = $1 AND q.code_mode = TRUE
   `, [assessment.id as number]);
   const templateRows = templateRowsRes.rows as { question_id: number; language_id: number; starter_code: string }[];
 
