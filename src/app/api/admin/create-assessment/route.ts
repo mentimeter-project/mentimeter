@@ -1,3 +1,4 @@
+throw new Error("FORCE ERROR TEST");
 import { getIronSession } from 'iron-session';
 import { cookies } from 'next/headers';
 console.log("NEW VERSION DEPLOYED");
