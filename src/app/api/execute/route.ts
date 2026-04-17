@@ -3,7 +3,7 @@ import { getIronSession } from 'iron-session';
 import { cookies } from 'next/headers';
 import { sessionOptions, SessionData } from '@/lib/session';
 
-const PISTON_URL = 'https://emkc.org/api/v2/piston';
+const PISTON_URL = process.env.PISTON_URL || 'http://localhost:2000/api/v2/piston';
 
 // ── Normalize output: strip whitespace/newlines for comparison ──
 function normalizeOutput(str: string): string {
@@ -22,8 +22,8 @@ const LANGUAGE_MAP: Record<number, {
   version: string;
   extension: string;
 }> = {
-  71: { language: 'python',     version: '3.10.0',  extension: 'py'   },
-  63: { language: 'javascript', version: '18.15.0', extension: 'js'   },
+  71: { language: 'python',     version: '3.12.0',  extension: 'py'   },
+  63: { language: 'javascript', version: '20.11.1', extension: 'js'   },
   62: { language: 'java',       version: '15.0.2',  extension: 'java' },
   54: { language: 'c++',        version: '10.2.0',  extension: 'cpp'  },
   50: { language: 'c',          version: '10.2.0',  extension: 'c'    },
