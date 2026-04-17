@@ -6,7 +6,6 @@ import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LANGUAGES, type Language } from '@/components/CodeEditor';
 import EvalResultCard, { EvalResultSkeleton } from '@/components/EvalResultCard';
-import { useSubmissionPoller } from '@/hooks/useSubmissionPoller';
 
 const CodeEditor = dynamic(() => import('@/components/CodeEditor'), { ssr: false });
 
@@ -40,24 +39,7 @@ export default function StudentPage() {
   const [evaluating, setEvaluating] = useState<number | null>(null);
   const [evalResults, setEvalResults] = useState<Record<number, any>>({});
   
-  const onPollComplete = useCallback((questionId: number, data: any) => {
-    setEvalResults(prev => ({ ...prev, [questionId]: data }));
-    if (!data.error) {
-      setAnsweredMap(prev => ({
-        ...prev,
-        [questionId]: { answer_text: codeDrafts[questionId]?.code, marks_awarded: data.score, reviewed: 1 }
-      }));
-      setSavedAt(prev => ({ ...prev, [questionId]: new Date().toLocaleTimeString() }));
-    }
-    setEvaluating(null);
-  }, [codeDrafts]);
 
-  const onPollError = useCallback((questionId: number, error: string) => {
-    setEvalResults(prev => ({ ...prev, [questionId]: { error } }));
-    setEvaluating(null);
-  }, []);
-
-  const { polls, startPolling } = useSubmissionPoller(onPollComplete, onPollError);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [currentUser, setCurrentUser] = useState('');
   const [name, setName] = useState('');
@@ -198,6 +180,7 @@ export default function StudentPage() {
     const draft = codeDrafts[questionId];
     if (!draft?.code?.trim()) return;
     setEvaluating(questionId);
+    setEvalResults(prev => { const n = { ...prev }; delete n[questionId]; return n; });
     try {
       const res = await fetch('/api/student/evaluate-submission', {
         method: 'POST',
@@ -212,9 +195,9 @@ export default function StudentPage() {
       const responseText = await res.text();
       let data;
 
-      if (!responseText || responseText.trim() === "") {
-        console.error("Empty response from execution API");
-        setEvalResults(prev => ({ ...prev, [questionId]: { error: "Execution engine returned empty response" } }));
+      if (!responseText || responseText.trim() === '') {
+        console.error('Empty response from execution API');
+        setEvalResults(prev => ({ ...prev, [questionId]: { error: 'Execution engine returned empty response' } }));
         setEvaluating(null);
         return;
       }
@@ -222,44 +205,40 @@ export default function StudentPage() {
       try {
         data = JSON.parse(responseText);
       } catch (err) {
-        console.error("Invalid JSON response:", responseText);
-        setEvalResults(prev => ({ ...prev, [questionId]: { error: "Execution engine returned invalid response" } }));
+        console.error('Invalid JSON response:', responseText);
+        setEvalResults(prev => ({ ...prev, [questionId]: { error: 'Execution engine returned invalid response' } }));
         setEvaluating(null);
         return;
       }
 
-      if (!data || typeof data !== "object") {
-        setEvalResults(prev => ({ ...prev, [questionId]: { error: "Invalid response structure from evaluation service" } }));
+      if (!data || typeof data !== 'object') {
+        setEvalResults(prev => ({ ...prev, [questionId]: { error: 'Invalid response structure from evaluation service' } }));
         setEvaluating(null);
         return;
       }
 
       if (data.error) {
-        // Handle specifically requested analysis warning fallback if execution otherwise exists
-        const errorMsg = data.failedAnalysis ? "Analysis failed, but execution succeeded" : data.error;
-        setEvalResults(prev => ({ ...prev, [questionId]: { error: errorMsg } }));
+        setEvalResults(prev => ({ ...prev, [questionId]: { error: data.error } }));
         setEvaluating(null);
         return;
       }
-      
+
       if (data.alreadySubmitted) {
         setEvalResults(prev => ({ ...prev, [questionId]: { error: 'You have already submitted this question.' } }));
         setEvaluating(null);
         return;
       }
-      
-      if (data.status === 'queued' && data.logId) {
-        startPolling(questionId, data.logId);
-      } else {
-        setEvalResults(prev => ({ ...prev, [questionId]: data }));
-        if (!data.error) {
-          setAnsweredMap(prev => ({ ...prev, [questionId]: { answer_text: draft.code, marks_awarded: data.score, reviewed: 1 } }));
-          setSavedAt(prev => ({ ...prev, [questionId]: new Date().toLocaleTimeString() }));
-        }
-        setEvaluating(null);
-      }
+
+      // Direct result — update UI immediately
+      setEvalResults(prev => ({ ...prev, [questionId]: data }));
+      setAnsweredMap(prev => ({
+        ...prev,
+        [questionId]: { answer_text: draft.code, marks_awarded: data.score, reviewed: 1 }
+      }));
+      setSavedAt(prev => ({ ...prev, [questionId]: new Date().toLocaleTimeString() }));
+      setEvaluating(null);
     } catch (err) {
-      console.error("Evaluation request failed:", err);
+      console.error('Evaluation request failed:', err);
       setEvalResults(prev => ({ ...prev, [questionId]: { error: 'Network error. Please try again.' } }));
       setEvaluating(null);
     }
@@ -484,7 +463,7 @@ export default function StudentPage() {
                   const q = questions[activeQ];
                   const qid = q.id as number;
                   const res = evalResults[qid];
-                  const isEval = evaluating === qid || (polls[qid] && (polls[qid].status === 'queued' || polls[qid].status === 'running'));
+                  const isEval = evaluating === qid;
                   const ans = answeredMap[qid];
                   const isSub = !!ans?.answer_text;
                   const draft = draftAnswers[qid] ?? ans?.answer_text ?? '';
@@ -539,7 +518,7 @@ export default function StudentPage() {
                                 </div>
                                 <motion.button whileHover={{ scale: 1.05, filter: "brightness(1.1)" }} whileTap={{ scale: 0.95 }} onClick={() => evaluateCode(qid)} disabled={isEval || !codeDrafts[qid]?.code?.trim()} className={`relative overflow-hidden premium-gradient text-white px-10 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-2xl flex items-center gap-4 transition-all ${isEval ? 'opacity-50 cursor-not-allowed grayscale' : 'shadow-indigo-500/30'}`}>
                                   {isEval ? (
-                                    <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> {polls[qid]?.status === 'queued' ? 'In queue...' : 'Running...'}</>
+                                    <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Executing...</>
                                   ) : (
                                     <><span className="text-base leading-none">🚀</span> Run Code</>
                                   )}
@@ -548,7 +527,7 @@ export default function StudentPage() {
                             )}
 
                             <AnimatePresence>
-                              {isEval && <EvalResultSkeleton key="skeleton" statusText={polls[qid]?.status === 'queued' ? `Synchronizing your request, ${firstName}...` : `Evaluating logic matrix, ${firstName}...`} />}
+                              {isEval && <EvalResultSkeleton key="skeleton" statusText={`Executing your code, ${firstName}...`} />}
                               {!isEval && res && (
                                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", damping: 25 }}>
                                   {res.error ? (

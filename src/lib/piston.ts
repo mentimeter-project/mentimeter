@@ -17,7 +17,7 @@
  *   6. Health check utility.
  */
 
-import { appRedis } from '@/queue';
+// No external dependencies needed — rate limiter is in-memory.
 
 // ─────────────────────────────────────────────────────────────────────────────
 // § 1  Configuration
@@ -377,24 +377,25 @@ class ConcurrencyQueue {
 const executionQueue = new ConcurrencyQueue(4);
 
 /**
- * Production-Safe Redis Rate Limiter
- * Limits students (by ID) to 15 submissions per minute across multi-node servers natively.
+ * In-memory rate limiter.
+ * Limits students (by ID) to 15 submissions per 60-second window.
+ * No Redis dependency — works for single-instance deployments.
  */
+const rateLimitMap = new Map<number, { count: number; expiresAt: number }>();
+
 export async function checkRateLimit(studentId: number): Promise<boolean> {
-  const windowSeconds = 60;
+  const windowMs = 60_000;
   const maxRequests = 15;
-  const key = `ratelimit:student:${studentId}`;
-  
-  try {
-    const count = await appRedis.incr(key);
-    if (count === 1) {
-      await appRedis.expire(key, windowSeconds);
-    }
-    return count <= maxRequests;
-  } catch (err) {
-    console.error('Redis Rate limiter failed crucially, bypassing gracefully to prevent complete lockouts:', err);
-    return true; // fail-open so evaluations still happen if redis disconnects temporarily limits aside
+  const now = Date.now();
+
+  const entry = rateLimitMap.get(studentId);
+  if (!entry || now >= entry.expiresAt) {
+    rateLimitMap.set(studentId, { count: 1, expiresAt: now + windowMs });
+    return true;
   }
+
+  entry.count++;
+  return entry.count <= maxRequests;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
