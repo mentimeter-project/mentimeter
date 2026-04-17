@@ -1,5 +1,6 @@
 import { getIronSession } from 'iron-session';
 import { cookies } from 'next/headers';
+console.log("NEW VERSION DEPLOYED");
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import { sessionOptions, SessionData } from '@/lib/session';
