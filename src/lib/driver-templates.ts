@@ -66,44 +66,35 @@ const pythonGenerator: TemplateGenerator = {
 
     // Wrapped in a scoped function to avoid variable collision with student code.
     // Uses underscore-prefixed imports so student's `import json` etc. still work.
-    const driverCode = `
+    const driverCode = `{{USER_CODE}}
+
 # ── Driver (hidden) ──────────────────────────────────────────────────────────
+import sys as _sys, json as _json
+
 def __driver_main__():
-    import sys as _sys, json as _json, io as _io
     _raw = _sys.stdin.read().strip()
     _args = _json.loads(_raw) if _raw else []
     if not isinstance(_args, list):
         _args = [_args]
         
-    # Redirect stdout to capture user debug prints safely
-    _original_stdout = _sys.stdout
-    _debug_buffer = _io.StringIO()
-    _sys.stdout = _debug_buffer
-    
-    _result = None
     try:
         _result = ${functionName}(*_args)
-    finally:
-        # Restore stdout so driver can print the actual result
-        _sys.stdout = _original_stdout
-        
-    # Pipe captured debug prints to stderr so they don't corrupt stdout matching
-    _captured_debug = _debug_buffer.getvalue()
-    if _captured_debug:
-        _sys.stderr.write("--- Debug Logs ---\\n" + _captured_debug + "\\n")
-        _sys.stderr.flush()
+        if isinstance(_result, bool):
+            print("true" if _result else "false")
+        elif isinstance(_result, (list, dict)):
+            print(_json.dumps(_result))
+        elif isinstance(_result, tuple):
+            print(_json.dumps(list(_result)))
+        elif _result is None:
+            print("null")
+        else:
+            print(_result)
+    except Exception as e:
+        import traceback
+        _sys.stderr.write(traceback.format_exc())
 
-    if isinstance(_result, bool):
-        print("true" if _result else "false")
-    elif isinstance(_result, (list, dict)):
-        print(_json.dumps(_result))
-    elif isinstance(_result, tuple):
-        print(_json.dumps(list(_result)))
-    elif _result is None:
-        print("null")
-    else:
-        print(_result)
-__driver_main__()
+if __name__ == '__main__':
+    __driver_main__()
 `;
     return { starterCode, driverCode };
   },
@@ -125,49 +116,34 @@ const javascriptGenerator: TemplateGenerator = {
 
     // IIFE prevents variable leakage. Leading semicolon guards against missing
     // semicolons in student code.
-    const driverCode = `
+    const driverCode = `{{USER_CODE}}
+
 // ── Driver (hidden) ──────────────────────────────────────────────────────────
-;(function() {
-    const _fs = require('fs');
-    const _raw = _fs.readFileSync('/dev/stdin', 'utf-8').trim();
-    const _parsed = _raw ? JSON.parse(_raw) : [];
-    const _args = Array.isArray(_parsed) ? _parsed : [_parsed];
-    
-    // Intercept console.log to prevent stdout corruption
-    const _originalConsoleLog = console.log;
-    const _originalConsoleInfo = console.info;
-    const _originalConsoleWarn = console.warn;
-    
-    // Redirect standard logs to stderr (console.error)
-    const _mockLog = function(...args) {
-        console.error("--- Debug Logs ---");
-        console.error(...args);
-    };
-    
-    console.log = _mockLog;
-    console.info = _mockLog;
-    console.warn = _mockLog;
-    
-    let _result;
+const _fs = require('fs');
+
+function __driver_main__() {
     try {
-        _result = ${functionName}(..._args);
-    } finally {
-        // Restore console functions
-        console.log = _originalConsoleLog;
-        console.info = _originalConsoleInfo;
-        console.warn = _originalConsoleWarn;
+        const _raw = _fs.readFileSync('/dev/stdin', 'utf-8').trim();
+        const _parsed = _raw ? JSON.parse(_raw) : [];
+        const _args = Array.isArray(_parsed) ? _parsed : [_parsed];
+        
+        const _result = ${functionName}(..._args);
+        
+        if (_result === null || _result === undefined) {
+            console.log("null");
+        } else if (typeof _result === 'boolean') {
+            console.log(_result ? "true" : "false");
+        } else if (typeof _result === 'object') {
+            console.log(JSON.stringify(_result));
+        } else {
+            console.log(_result);
+        }
+    } catch (err) {
+        console.error(err);
     }
-    
-    if (_result === null || _result === undefined) {
-        console.log("null");
-    } else if (typeof _result === 'boolean') {
-        console.log(_result ? "true" : "false");
-    } else if (typeof _result === 'object') {
-        console.log(JSON.stringify(_result));
-    } else {
-        console.log(_result);
-    }
-})();
+}
+
+__driver_main__();
 `;
     return { starterCode, driverCode };
   },
@@ -196,7 +172,8 @@ int ${functionName}(vector<int>& nums) {
 
     // The default C++ driver parses a JSON array of ints from stdin.
     // For problems with different signatures, admin should provide custom driver.
-    const driverCode = `
+    const driverCode = `{{USER_CODE}}
+
 // ── Driver (hidden) ──────────────────────────────────────────────────────────
 #include <sstream>
 
@@ -268,7 +245,8 @@ public class Solution {
     // Java driver reads JSON array from stdin and calls the static method.
     // Placed in a separate Main class that imports Solution.
     // Since Piston compiles all classes in one file, Main must come after Solution.
-    const driverCode = `
+    const driverCode = `{{USER_CODE}}
+
 // ── Driver (hidden) ──────────────────────────────────────────────────────────
 class Main {
     public static void main(String[] args) throws Exception {
@@ -296,7 +274,7 @@ class Main {
                 _out.append(_arr[i]);
             }
             _out.append("]");
-            System.out.println(_out);
+            System.out.println(_out.toString());
         } else if (_result instanceof Boolean) {
             System.out.println(((Boolean) _result) ? "true" : "false");
         } else {
@@ -328,7 +306,8 @@ int ${functionName}(int* nums, int numsSize) {
 }
 `;
 
-    const driverCode = `
+    const driverCode = `{{USER_CODE}}
+
 // ── Driver (hidden) ──────────────────────────────────────────────────────────
 int main() {
     char _buf[65536];
