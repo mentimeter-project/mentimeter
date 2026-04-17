@@ -120,11 +120,16 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, assessmentId });
 
-  } catch (err) {
-    await client.query('ROLLBACK');
-    console.error('CREATE ASSESSMENT ERROR:', err);
-    return NextResponse.json({ error: 'Failed to create assessment' }, { status: 500 });
-  } finally {
+  } catch (err: any) {
+  await client.query('ROLLBACK');
+  console.error('CREATE ASSESSMENT ERROR:', err);
+
+  return NextResponse.json(
+    { error: err.message || "Unknown error" },
+    { status: 500 }
+  );
+}
+    finally {
     client.release();
   }
 }
