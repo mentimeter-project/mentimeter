@@ -15,11 +15,14 @@ interface TestCaseInput {
 
 interface QuestionInput {
   question_text: string;
-  question_type?: 'text' | 'code';
+  question_type?: 'text' | 'code' | 'debug';
   code_mode?: 'stdin' | 'function';
   function_name?: string;
   max_marks?: number;
   test_cases?: TestCaseInput[];
+  // Debug-type fields
+  debug_expected_output?: string;
+  debug_case_sensitive?: boolean;
 }
 
 function sanitiseFunctionName(raw: string): { ok: true; name: string } | { ok: false; error: string } {
@@ -64,9 +67,19 @@ export async function POST(req: NextRequest) {
     for (let i = 0; i < questions.length; i++) {
       const q = questions[i];
 
+      // ── Derive DB question type ────────────────────────────────────────────
       let dbQuestionType = 'text';
       if (q.question_type === 'code') {
         dbQuestionType = q.code_mode === 'function' ? 'code_function' : 'code_stdin';
+      } else if (q.question_type === 'debug') {
+        dbQuestionType = 'debug';
+      }
+
+      // ── Validate debug questions ───────────────────────────────────────────
+      if (dbQuestionType === 'debug') {
+        if (!q.debug_expected_output?.trim()) {
+          throw new Error(`Question ${i + 1} is a debug question but has no expected output.`);
+        }
       }
 
       let functionName: string | null = null;
@@ -79,15 +92,22 @@ export async function POST(req: NextRequest) {
         functionName = sanitised.name;
       }
 
+      // ── Persist question ───────────────────────────────────────────────────
       const qResult = await client.query(
-        'INSERT INTO questions (assessment_id, question_text, question_type, function_name, max_marks, order_index) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
+        `INSERT INTO questions
+           (assessment_id, question_text, question_type, function_name, max_marks, order_index,
+            debug_expected_output, debug_case_sensitive)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         RETURNING id`,
         [
           assessmentId,
           q.question_text,
           dbQuestionType,
           functionName,
           q.max_marks || 10,
-          i
+          i,
+          dbQuestionType === 'debug' ? q.debug_expected_output!.trim() : null,
+          dbQuestionType === 'debug' ? (q.debug_case_sensitive === false ? 0 : 1) : 1,
         ]
       );
 

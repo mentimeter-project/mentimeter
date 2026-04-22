@@ -39,6 +39,9 @@ export default function StudentPage() {
   const [questionTemplates, setQuestionTemplates] = useState<Record<number, Record<number, string>>>({});
   const [evaluating, setEvaluating] = useState<number | null>(null);
   const [evalResults, setEvalResults] = useState<Record<number, any>>({});
+  // ── Debug question state ──
+  const [debugSubmitting, setDebugSubmitting] = useState<number | null>(null);
+  const [debugResults, setDebugResults] = useState<Record<number, { status: 'accepted' | 'wrong_answer'; marks: number; maxMarks: number; message: string } | null>>({});
   
   const [running, setRunning] = useState(false);
   const [runResult, setRunResult] = useState<{
@@ -435,7 +438,7 @@ export default function StudentPage() {
                       <span className="text-[9px] font-black uppercase tracking-widest text-indigo-500/70">{q.max_marks as number} Points</span>
                       <span className="w-1 h-1 rounded-full bg-slate-400 opacity-30" />
                       <span className="text-[9px] font-black uppercase tracking-widest opacity-60 truncate">
-                        {q.question_type === 'code_function' ? 'CODE (FUNCTION)' : q.question_type === 'code_stdin' ? 'CODE (I/O)' : 'TEXT'}
+                        {q.question_type === 'code_function' ? 'CODE (FUNCTION)' : q.question_type === 'code_stdin' ? 'CODE (I/O)' : q.question_type === 'debug' ? 'DEBUG' : 'TEXT'}
                       </span>
                     </div>
                   </div>
@@ -507,7 +510,102 @@ export default function StudentPage() {
                       </header>
 
                       <div className="space-y-8">
-                        {q.question_type.startsWith('code') ? (
+                        {q.question_type === 'debug' ? (
+                          // ── Debug Answer Panel ────────────────────────────────────────────────
+                          <div className="space-y-6">
+                            <div className="flex items-center justify-between px-2">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-500 text-sm">🐛</div>
+                                <h4 className="text-xs font-black uppercase tracking-[0.2em] text-foreground opacity-80">Debug Answer</h4>
+                              </div>
+                              {isSub && (
+                                <div className="px-4 py-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-black text-[10px] uppercase tracking-widest rounded-xl flex items-center gap-3 border border-emerald-500/20 shadow-sm">
+                                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Submitted
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="relative p-1 rounded-[2.5rem] bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/5 shadow-2xl focus-within:ring-2 ring-amber-500/20 transition-all duration-300">
+                              <textarea
+                                value={draft}
+                                onChange={e => setDraftAnswers(p => ({ ...p, [qid]: e.target.value }))}
+                                disabled={isSub}
+                                rows={12}
+                                placeholder="Type or paste the corrected output here..."
+                                className="w-full bg-transparent border-none focus:ring-0 p-10 text-base font-mono leading-relaxed resize-none custom-scrollbar text-foreground placeholder-muted-foreground/30"
+                              />
+                            </div>
+
+                            {!isSub && (
+                              <div className="flex justify-end pt-4">
+                                <motion.button
+                                  whileHover={{ scale: 1.05 }}
+                                  whileTap={{ scale: 0.95 }}
+                                  disabled={debugSubmitting === qid || !draft?.trim()}
+                                  onClick={async () => {
+                                    if (!draft?.trim()) return;
+                                    setDebugSubmitting(qid);
+                                    try {
+                                      const res = await fetch('/api/student/evaluate-debug', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ questionId: qid, answerText: draft.trim() }),
+                                      });
+                                      const data = await res.json();
+                                      if (res.ok) {
+                                        setDebugResults(p => ({ ...p, [qid]: data }));
+                                        setAnsweredMap(prev => ({ ...prev, [qid]: { answer_text: draft.trim(), marks_awarded: data.marks, reviewed: 1 } }));
+                                        setSavedAt(prev => ({ ...prev, [qid]: new Date().toLocaleTimeString() }));
+                                      } else if (data.alreadySubmitted) {
+                                        setAnsweredMap(prev => ({ ...prev, [qid]: { answer_text: draft.trim(), marks_awarded: null, reviewed: 0 } }));
+                                      }
+                                    } finally {
+                                      setDebugSubmitting(null);
+                                    }
+                                  }}
+                                  className="px-12 py-5 bg-amber-500 hover:bg-amber-600 text-white font-black rounded-2xl text-[11px] uppercase tracking-[0.25em] shadow-2xl shadow-amber-500/20 transition-all flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  {debugSubmitting === qid ? (
+                                    <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Evaluating...</>
+                                  ) : (
+                                    <><span className="text-lg">🐛</span> Submit Debug Answer</>
+                                  )}
+                                </motion.button>
+                              </div>
+                            )}
+
+                            {/* Debug result card */}
+                            <AnimatePresence>
+                              {debugResults[qid] && (
+                                <motion.div
+                                  initial={{ opacity: 0, y: 16 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  exit={{ opacity: 0, y: -10 }}
+                                  className={`rounded-3xl border p-8 space-y-4 ${
+                                    debugResults[qid]!.status === 'accepted'
+                                      ? 'bg-emerald-500/5 border-emerald-500/20'
+                                      : 'bg-red-500/5 border-red-500/20'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-4">
+                                    <span className="text-3xl">{debugResults[qid]!.status === 'accepted' ? '🎉' : '❌'}</span>
+                                    <div>
+                                      <p className={`text-lg font-black tracking-tight ${
+                                        debugResults[qid]!.status === 'accepted' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'
+                                      }`}>
+                                        {debugResults[qid]!.status === 'accepted' ? 'Accepted!' : 'Wrong Answer'}
+                                      </p>
+                                      <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60 mt-1">
+                                        Score: {debugResults[qid]!.marks} / {debugResults[qid]!.maxMarks} Points
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <p className="text-xs font-medium text-muted-foreground leading-relaxed">{debugResults[qid]!.message}</p>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
+                        ) : q.question_type.startsWith('code') ? (
                           <div className="space-y-8">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-3">

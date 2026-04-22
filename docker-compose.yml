@@ -1,5 +1,3 @@
-version: '3.9'
-
 services:
   judge0-server:
     image: judge0/judge0:1.13.1

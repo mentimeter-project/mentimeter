@@ -14,11 +14,14 @@ interface TestCase {
 
 interface Question {
   question_text: string;
-  question_type: 'text' | 'code';
+  question_type: 'text' | 'code' | 'debug';
   code_mode: 'stdin' | 'function';
   function_name: string;
   max_marks: number;
   test_cases: TestCase[];
+  // Debug-type fields
+  debug_expected_output: string;
+  debug_case_sensitive: boolean;
 }
 
 const emptyTestCase = (): TestCase => ({ input: '', expected_output: '', marks: 1 });
@@ -29,6 +32,8 @@ const emptyQ = (): Question => ({
   function_name: '',
   max_marks: 10,
   test_cases: [],
+  debug_expected_output: '',
+  debug_case_sensitive: true,
 });
 
 // ── Component ──────────────────────────────────────────────────────────────
@@ -45,9 +50,15 @@ export default function CreateAssessmentPage() {
   const updateQ = (i: number, field: keyof Question, value: string | number) =>
     setQuestions(prev => prev.map((q, idx) => idx === i ? { ...q, [field]: value } : q));
 
-  const setQType = (i: number, type: 'text' | 'code') =>
+  const setQType = (i: number, type: 'text' | 'code' | 'debug') =>
     setQuestions(prev => prev.map((q, idx) =>
-      idx === i ? { ...q, question_type: type, code_mode: type === 'code' ? q.code_mode : 'stdin', function_name: type === 'code' ? q.function_name : '', test_cases: type === 'code' && q.test_cases.length === 0 ? [emptyTestCase()] : q.test_cases } : q
+      idx === i ? {
+        ...q,
+        question_type: type,
+        code_mode: type === 'code' ? q.code_mode : 'stdin',
+        function_name: type === 'code' ? q.function_name : '',
+        test_cases: type === 'code' && q.test_cases.length === 0 ? [emptyTestCase()] : (type !== 'code' ? [] : q.test_cases),
+      } : q
     ));
 
   const setCodeMode = (i: number, mode: 'stdin' | 'function') =>
@@ -99,6 +110,11 @@ export default function CreateAssessmentPage() {
         }
         if (q.test_cases.some(tc => !tc.expected_output.trim())) {
           setError(`Question ${i + 1}: all test cases must have an expected output`); return;
+        }
+      }
+      if (q.question_type === 'debug') {
+        if (!q.debug_expected_output.trim()) {
+          setError(`Question ${i + 1} is a debug question but has no expected output`); return;
         }
       }
     }
@@ -223,6 +239,16 @@ export default function CreateAssessmentPage() {
                       >
                         💻 Code
                       </button>
+                      <button
+                        onClick={() => setQType(i, 'debug')}
+                        className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${
+                          q.question_type === 'debug'
+                            ? 'bg-white dark:bg-slate-700 shadow-sm text-amber-600 dark:text-amber-400'
+                            : 'text-muted-foreground'
+                        }`}
+                      >
+                        🐛 Debug
+                      </button>
                     </div>
                   </div>
 
@@ -235,6 +261,47 @@ export default function CreateAssessmentPage() {
                     />
                   </div>
                 </div>
+
+                {/* Debug Extras */}
+                {q.question_type === 'debug' && (
+                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="space-y-6 pt-6 border-t border-amber-100 dark:border-amber-500/10">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-7 h-7 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-500 text-sm">🐛</div>
+                      <span className="text-[10px] font-black uppercase tracking-[0.25em] text-amber-600 dark:text-amber-400">Debug Configuration</span>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className={labelClass}>Expected Output <span className="text-red-500">*</span></label>
+                      <p className="text-[9px] font-medium text-muted-foreground opacity-50 uppercase tracking-widest">Students must match this exactly (after trimming). Keep it precise.</p>
+                      <textarea
+                        value={q.debug_expected_output}
+                        onChange={e => setQuestions(prev => prev.map((qq, idx) => idx === i ? { ...qq, debug_expected_output: e.target.value } : qq))}
+                        rows={5}
+                        placeholder="Paste the correct output here..."
+                        className={`${inputClass} resize-none font-mono text-sm`}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between p-5 bg-amber-500/5 border border-amber-500/20 rounded-2xl">
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-400">Case Sensitivity</p>
+                        <p className="text-[9px] font-medium text-muted-foreground opacity-60">
+                          {q.debug_case_sensitive ? 'Strict — "Hello" ≠ "hello"' : 'Lenient — "Hello" = "hello"'}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setQuestions(prev => prev.map((qq, idx) => idx === i ? { ...qq, debug_case_sensitive: !qq.debug_case_sensitive } : qq))}
+                        className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors focus:outline-none ${
+                          q.debug_case_sensitive ? 'bg-amber-500' : 'bg-gray-300 dark:bg-slate-700'
+                        }`}
+                      >
+                        <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform ${
+                          q.debug_case_sensitive ? 'translate-x-8' : 'translate-x-1'
+                        }`} />
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
 
                 {/* Code Extras */}
                 {q.question_type === 'code' && (
