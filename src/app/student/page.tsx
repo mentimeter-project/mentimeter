@@ -513,10 +513,13 @@ export default function StudentPage() {
                         {q.question_type === 'debug' ? (
                           // ── Debug Answer Panel ────────────────────────────────────────────────
                           <div className="space-y-6">
-                            <div className="flex items-center justify-between px-2">
-                              <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-500 text-sm">🐛</div>
-                                <h4 className="text-xs font-black uppercase tracking-[0.2em] text-foreground opacity-80">Debug Answer</h4>
+                            <div className="flex items-start justify-between px-2">
+                              <div className="flex flex-col gap-1">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-500 text-sm">🐛</div>
+                                  <h4 className="text-xs font-black uppercase tracking-[0.2em] text-foreground opacity-80">Debug Answer</h4>
+                                </div>
+                                <p className="text-[10px] text-muted-foreground opacity-70 ml-11 italic">Minor formatting differences are ignored</p>
                               </div>
                               {isSub && (
                                 <div className="px-4 py-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-black text-[10px] uppercase tracking-widest rounded-xl flex items-center gap-3 border border-emerald-500/20 shadow-sm">
@@ -666,7 +669,7 @@ export default function StudentPage() {
                                     if (!currentCode) return;
 
                                     const langId = codeDrafts[qid]?.languageId ?? LANGUAGES[0].id;
-                                    const langName = LANGUAGES.find(l => l.id === langId)?.name?.toLowerCase() || '';
+                                    const langName = LANGUAGES.find(l => l.id === langId)?.monacoLang?.toLowerCase() || '';
                                     const parsedLang = langName.includes('javascript')
                                       ? 'javascript'
                                       : langName.includes('python')
