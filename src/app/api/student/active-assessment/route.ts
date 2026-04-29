@@ -1,17 +1,25 @@
 import { getIronSession } from 'iron-session';
 import { cookies } from 'next/headers';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { sessionOptions, SessionData } from '@/lib/session';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await getIronSession<SessionData>(cookies(), sessionOptions);
   if (session.role !== 'student') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
   }
 
+  const { searchParams } = new URL(req.url);
+  const idStr = searchParams.get('id');
+
+  if (!idStr) {
+    const listRes = await query('SELECT * FROM assessments WHERE is_active = 1');
+    return NextResponse.json({ assessments: listRes.rows });
+  }
+
   const assessmentRes = await query(
-    'SELECT * FROM assessments WHERE is_active = 1 LIMIT 1'
+    'SELECT * FROM assessments WHERE is_active = 1 AND id = $1', [parseInt(idStr)]
   );
   const assessment = assessmentRes.rows[0] as Record<string, unknown> | undefined;
 

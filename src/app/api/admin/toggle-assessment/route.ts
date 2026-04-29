@@ -10,8 +10,11 @@ export async function POST(req: NextRequest) {
 
   const { assessmentId, isActive } = await req.json();
 
-  if (isActive) await query('UPDATE assessments SET is_active = 0');
-  await query('UPDATE assessments SET is_active = $1 WHERE id = $2', [isActive ? 1 : 0, assessmentId]);
+  if (isActive) {
+    await query('UPDATE assessments SET is_active = 1, started_at = CURRENT_TIMESTAMP WHERE id = $1', [assessmentId]);
+  } else {
+    await query('UPDATE assessments SET is_active = 0 WHERE id = $1', [assessmentId]);
+  }
 
   return NextResponse.json({ success: true });
 }

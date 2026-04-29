@@ -199,6 +199,15 @@ export default function AdminDashboard() {
                   <Link href={`/admin/review/${a.id}`} className="text-[10px] font-black px-4 py-2 rounded-xl border border-indigo-500/20 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/30 transition-all uppercase tracking-widest shadow-sm hover:shadow-md">
                     ✍ Review
                   </Link>
+                  {a.is_active ? (
+                    <span title="Cannot edit live assessment" className="text-[10px] font-black px-4 py-2 rounded-xl border border-gray-400/20 bg-gray-400/10 text-gray-500 opacity-50 cursor-not-allowed uppercase tracking-widest shadow-sm">
+                      ✏️ Edit
+                    </span>
+                  ) : (
+                    <Link href={`/admin/edit-assessment/${a.id}`} className="text-[10px] font-black px-4 py-2 rounded-xl border border-blue-500/20 bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/30 transition-all uppercase tracking-widest shadow-sm hover:shadow-md">
+                      ✏️ Edit
+                    </Link>
+                  )}
                   <motion.button whileHover={{ scale: 1.05 }} onClick={() => toggleActive(a.id, a.is_active)}
                     className={`text-[10px] font-black px-4 py-2 rounded-xl border transition-all uppercase tracking-widest shadow-sm ${
                       a.is_active

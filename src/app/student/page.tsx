@@ -27,6 +27,8 @@ const getEncouragement = (answered: number, total: number, timeLeft: number | nu
 export default function StudentPage() {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>('questions');
+  const [selectedAssessmentId, setSelectedAssessmentId] = useState<number | null>(null);
+  const [availableAssessments, setAvailableAssessments] = useState<any[]>([]);
   const [assessment, setAssessment] = useState<any>(null);
   const [questions, setQuestions] = useState<any[]>([]);
   const [answeredMap, setAnsweredMap] = useState<Record<number, any>>({});
@@ -118,7 +120,14 @@ export default function StudentPage() {
   };
 
   const fetchAssessment = useCallback(async () => {
-    const res = await fetch('/api/student/active-assessment');
+    if (!selectedAssessmentId) {
+      const res = await fetch('/api/student/active-assessment');
+      const data = await res.json();
+      setAvailableAssessments(data.assessments || []);
+      setLoading(false);
+      return;
+    }
+    const res = await fetch(`/api/student/active-assessment?id=${selectedAssessmentId}`);
     const data = await res.json();
     setAssessment(data.assessment || null);
     setQuestions(data.questions || []);
@@ -126,10 +135,14 @@ export default function StudentPage() {
     setQuestionTemplates(data.questionTemplates || {});
     if (data.assessment && startTimeRef.current === null) {
       startTimeRef.current = Date.now();
-      setTimeLeft(((data.assessment.duration_minutes as number) || 30) * 60);
+      const startedAt = new Date(data.assessment.started_at || Date.now()).getTime();
+      const durationMs = ((data.assessment.duration_minutes as number) || 30) * 60000;
+      const elapsed = Date.now() - startedAt;
+      const remainingSec = Math.max(0, Math.floor((durationMs - elapsed) / 1000));
+      setTimeLeft(remainingSec);
     }
     setLoading(false);
-  }, []);
+  }, [selectedAssessmentId]);
 
   const fetchLeaderboard = useCallback(async () => {
     const res = await fetch('/api/student/leaderboard');
@@ -396,6 +409,56 @@ export default function StudentPage() {
       </nav>
 
       {/* Main Container */}
+      {!selectedAssessmentId ? (
+        <div className="flex-1 overflow-y-auto p-12 lg:p-16 relative flex flex-col items-center bg-background custom-scrollbar">
+          <div className="w-full max-w-5xl space-y-12">
+            <header className="space-y-4">
+              <h2 className="text-4xl font-black tracking-tight text-foreground italic">Available Assessments</h2>
+              <p className="text-muted-foreground font-medium uppercase tracking-widest text-xs">Select an assessment to begin.</p>
+            </header>
+            
+            {loading ? (
+              <div className="flex justify-center py-20">
+                <div className="w-10 h-10 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
+              </div>
+            ) : availableAssessments.length === 0 ? (
+              <div className="glass-premium border-2 border-dashed border-gray-200 dark:border-white/10 rounded-3xl p-16 text-center">
+                <p className="text-5xl mb-6 shadow-sm">📝</p>
+                <p className="text-muted-foreground font-black uppercase tracking-widest text-sm mb-4">No live assessments right now</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {availableAssessments.map(a => {
+                  const startedAt = new Date(a.started_at || Date.now()).getTime();
+                  const durationMs = (a.duration_minutes || 30) * 60000;
+                  const elapsed = Date.now() - startedAt;
+                  const remainingSec = Math.max(0, Math.floor((durationMs - elapsed) / 1000));
+                  
+                  return (
+                    <motion.div key={a.id} whileHover={{ y: -4 }} className="glass-premium rounded-[2rem] p-8 flex flex-col gap-6 shadow-xl border border-gray-100 dark:border-white/5 relative group overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+                      <div>
+                        <span className="inline-block px-3 py-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-black uppercase tracking-widest rounded-lg mb-4">Live</span>
+                        <h3 className="text-xl font-black text-foreground mb-2 leading-tight">{a.title}</h3>
+                        <p className="text-xs text-muted-foreground line-clamp-2 opacity-80">{a.description || 'No description provided.'}</p>
+                      </div>
+                      <div className="mt-auto space-y-4">
+                        <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest opacity-60">
+                          <span>⏱ {remainingSec > 0 ? formatTime(remainingSec) : '00:00'} left</span>
+                          <span>{a.duration_minutes} Mins Total</span>
+                        </div>
+                        <button onClick={() => setSelectedAssessmentId(a.id)} className="w-full py-4 premium-gradient text-white rounded-xl font-black text-[11px] uppercase tracking-widest shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 transition-all flex items-center justify-center gap-2">
+                          Enter Assessment 🚀
+                        </button>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
       <div className="flex flex-1 overflow-hidden relative">
         {/* Sidebar */}
         <aside className="w-80 glass border-r border-gray-200 dark:border-white/5 p-8 flex flex-col gap-8 flex-shrink-0 relative z-40">
@@ -831,6 +894,7 @@ export default function StudentPage() {
           </AnimatePresence>
         </main>
       </div>
+      )}
     </div>
   );
 }
